@@ -12,9 +12,15 @@
   import { logNow } from '$lib/log.svelte';
   import { rememberOpen } from '$lib/disclosure';
   import Busy from '$lib/components/Busy.svelte';
+  import { provideCommunity } from './community.svelte';
 
   let { data, children }: LayoutProps = $props();
   const model = provideState(untrack(() => data.today));
+  const community = provideCommunity();
+  $effect(() => {
+    community.invites = data.pendingInvites;
+    community.recommendations = data.pendingRecommendations;
+  });
   let mode = $state('dark');
   let menuOpen = $state(false);
   const nav = app.nav.filter(item => !item.feature || features[item.feature]);
@@ -48,7 +54,14 @@
     <button class="menu-button secondary" aria-expanded={menuOpen} aria-controls="main-nav" onclick={() => menuOpen = !menuOpen}>Menu</button>
     <nav id="main-nav" class:menu-open={menuOpen} aria-label="Main navigation">
       {#each nav as item}
-        <a href={item.href} aria-current={page.url.pathname === item.href ? 'page' : undefined} onclick={() => menuOpen = false}>{item.label}</a>
+        <a href={item.href} aria-current={page.url.pathname === item.href ? 'page' : undefined} onclick={() => menuOpen = false}>
+          {item.label}
+          {#if item.feature === 'challenges' && community.invites}
+            <span class="nav-badge" aria-label={`${community.invites} pending invites`}>{community.invites}</span>
+          {:else if item.feature === 'recommendations' && community.recommendations}
+            <span class="nav-badge" aria-label={`${community.recommendations} pending recommendations`}>{community.recommendations}</span>
+          {/if}
+        </a>
       {/each}
     </nav>
     {#if features.reminders}
@@ -61,7 +74,7 @@
   <button class="secondary" onclick={toggleMode} aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>{mode === 'dark' ? 'Light mode' : 'Dark mode'}</button>
   {#if data.user}
     <details class="user-menu" use:rememberOpen={'user-menu'}><summary>{data.user.name}</summary>
-      <div><p>{data.user.email}</p><form method="POST" action="/logout"><button type="submit" class="secondary">Log out</button></form></div>
+      <div><p>{data.user.email}</p><p>User ID: <code>{data.user.id}</code></p><form method="POST" action="/logout"><button type="submit" class="secondary">Log out</button></form></div>
     </details>
   {/if}
 </header>
@@ -84,3 +97,6 @@
     <div class:toast-error={toast.error} class="toast">{toast.message}<button class="secondary" aria-label="Dismiss notification" onclick={() => model.toasts.dismiss(toast.id)}>Close</button></div>
   {/each}
 </aside>
+<style>
+  .nav-badge { display: inline-block; padding: 0 0.4rem; border-radius: var(--hl-radius); background: var(--hl-accent); color: var(--hl-accent-contrast); font-size: 0.8rem; }
+</style>
