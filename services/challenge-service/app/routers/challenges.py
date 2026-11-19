@@ -231,6 +231,29 @@ def validate_recipients(user_ids: list[UUID], request: Request) -> None:
         raise HTTPException(status_code=503, detail="Invite recipients could not be verified") from None
 
 
+def resolve_emails(emails: list[str], request: Request) -> list[UUID]:
+    if not emails:
+        return []
+    settings = get_settings()
+    resolved: list[UUID] = []
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            for email in emails:
+                response = client.get(
+                    f"{settings.user_service_url}/api/users/internal/users",
+                    params={"email": email},
+                    headers={"Authorization": request.headers["Authorization"],
+                             "X-Internal-Token": settings.internal_token.get_secret_value()},
+                )
+                if response.status_code == 404:
+                    raise HTTPException(status_code=404, detail=f"No participant found for {email}")
+                response.raise_for_status()
+                resolved.append(UUID(response.json()["id"]))
+    except (httpx.HTTPError, KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=503, detail="Invite recipients could not be verified") from None
+    return resolved
+
+
 @router.post("/{id}/invites", response_model=InviteResponse)
 def invite_users(
     id: UUID, identity: Identity, db: Database, request: Request, body: InviteCreate | None = None,
@@ -240,8 +263,10 @@ def invite_users(
     if challenge.owner_id != UUID(identity["user_id"]):
         raise HTTPException(status_code=403, detail="Only the challenge owner can invite users")
     require_open(challenge)
-    user_ids = [] if body is None else body.user_ids
+    user_ids = [] if body is None else list(body.user_ids)
     validate_recipients(user_ids, request)
+    if body is not None:
+        user_ids = list(dict.fromkeys([*user_ids, *resolve_emails(body.emails, request)]))
     for user_id in user_ids:
         participant = participant_for(db, challenge, user_id)
         if participant is None:

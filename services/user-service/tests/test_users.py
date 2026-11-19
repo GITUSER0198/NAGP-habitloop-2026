@@ -226,7 +226,7 @@ def test_profile_requires_bearer(client: TestClient, headers: dict[str, str]) ->
 
 
 @pytest.mark.parametrize("change", [
-    {"email": "invalid"}, {"password": ""}, {"password": "x" * 73},
+    {"email": "invalid"}, {"email": "alex@demo.test"}, {"password": ""}, {"password": "x" * 73},
     {"password": "\u00e9" * 37}, {"name": " "}, {"tenant_name": "!!!"},
     {"timezone": "Unknown/Timezone"},
 ])
@@ -257,3 +257,20 @@ def test_swagger_lists_all_public_routes(client: TestClient) -> None:
     assert {"get", "patch"} <= paths[f"{PREFIX}/me"].keys()
     assert "get" in paths[f"{PREFIX}/tenants/{{slug}}"]
     assert f"{PREFIX}/internal/users/{{id}}" not in paths
+
+
+def test_internal_email_lookup_is_tenant_scoped_and_requires_both_tokens(client: TestClient) -> None:
+    account = register(client)
+    teammate = register(client, email="teammate@example.com")
+    outsider = register(client, tenant_name="Other", email="outsider@example.com")
+    path = f"{PREFIX}/internal/users"
+    for headers in ({}, bearer(account), {"X-Internal-Token": get_settings().internal_token.get_secret_value()}):
+        assert client.get(path, params={"email": "teammate@example.com"}, headers=headers).status_code == 401
+    response = client.get(path, params={"email": "TEAMMATE@example.com"}, headers=internal_headers(account))
+    assert response.status_code == 200
+    assert response.json()["id"] == teammate["user"]["id"]
+    assert "password_hash" not in response.json()
+    assert client.get(path, params={"email": outsider["user"]["email"]}, headers=internal_headers(account)).status_code == 404
+    assert client.get(path, params={"email": "unknown@example.com"}, headers=internal_headers(account)).status_code == 404
+    assert client.get(path, params={"email": "invalid"}, headers=internal_headers(account)).status_code == 422
+    assert path not in client.get(f"{PREFIX}/openapi.json").json()["paths"]

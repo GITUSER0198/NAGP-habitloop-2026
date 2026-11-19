@@ -19,7 +19,7 @@ export interface Recommendation {
 }
 export interface RecommendationList { recommendations: Recommendation[]; reason?: string }
 export interface ChallengeProgress {
-  leaderboard: { user_id: string; count: number; target: number }[];
+  leaderboard: { user_id: string; name: string; count: number; target: number }[];
 }
 export function schedule(value: Record<string, string | number>): string {
   return Object.entries(value).map(([key, item]) => key === 'preferred_time'

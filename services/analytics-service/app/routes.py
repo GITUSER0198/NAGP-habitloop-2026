@@ -98,6 +98,25 @@ def challenge_progress(id: UUID, request: Request, identity: Identity, table: Ta
     leaderboard = [{"user_id": item["user_id"], "count": int(item.get("count", 0)), "target": target}
                    for item in rows]
     leaderboard.sort(key=lambda item: (-item["count"], item["user_id"]))
+    names: dict[str, str] = {}
+    try:
+        with httpx.Client(timeout=3.0) as client:
+            for item in leaderboard:
+                uid = item["user_id"]
+                if uid not in names:
+                    response = client.get(
+                        f"{settings.user_service_url}/api/users/internal/users/{uid}",
+                        headers={"Authorization": request.headers["Authorization"],
+                                 "X-Internal-Token": settings.internal_token.get_secret_value()},
+                    )
+                    if response.status_code == 404:
+                        names[uid] = "Former participant"
+                    else:
+                        response.raise_for_status()
+                        names[uid] = str(response.json()["name"])
+                item["name"] = names[uid]
+    except (httpx.HTTPError, KeyError, TypeError, ValueError):
+        raise HTTPException(status_code=503, detail="Participant names are unavailable") from None
     for rank, item in enumerate(leaderboard, start=1):
         item["rank"] = rank
     return {"challenge_id": str(id), "target": target, "leaderboard": leaderboard}

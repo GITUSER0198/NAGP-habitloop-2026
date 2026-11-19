@@ -33,11 +33,14 @@ def configured_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 @pytest.fixture
 def recipients(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    state: dict[str, Any] = {"missing": set(), "status": 200, "requests": []}
+    state: dict[str, Any] = {"missing": set(), "status": 200, "requests": [], "emails": {}}
     real_client = httpx.Client
 
     def handle(request: httpx.Request) -> httpx.Response:
         state["requests"].append(request)
+        if request.url.path == "/api/users/internal/users":
+            user_id = state["emails"].get(request.url.params["email"])
+            return httpx.Response(404 if user_id is None else state["status"], json={"id": user_id})
         user_id = request.url.path.rsplit("/", 1)[-1]
         status = 404 if user_id in state["missing"] else state["status"]
         return httpx.Response(status, json={"id": user_id})

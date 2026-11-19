@@ -23,10 +23,9 @@ export const actions: Actions = {
     requireFeature('challenges');
     try {
       const data = await event.request.formData();
-      const recipient = field(data, 'user_id');
-      if (recipient) resourceId(recipient);
+      const recipient = field(data, 'email');
       const invitation = await post<{ invite_code: string }>(event, `/api/challenges/${resourceId(event.params.id)}/invites`, {
-        user_ids: recipient ? [recipient] : []
+        emails: recipient ? [recipient] : []
       });
       return { code: invitation.invite_code, message: recipient ? 'Invitation sent.' : 'Share this invite code.' };
     } catch (cause) { return actionFailure(cause); }

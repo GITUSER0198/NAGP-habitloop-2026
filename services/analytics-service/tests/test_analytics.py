@@ -111,10 +111,14 @@ def test_challenge_leaderboard_checks_visibility_and_partition(
                             (other_tenant, str(uuid4()), 99)]:
         table.put_item(Item={"PK": challenge_pk(tid, cid), "SK": f"PROGRESS#{uid}", "user_id": uid, "count": count})
     real_client = httpx.Client
-    state = {"status": 200}
+    state: dict[str, Any] = {"status": 200, "lookups": []}
 
     def respond(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == headers["Authorization"]
+        assert request.headers["X-Internal-Token"] == get_settings().internal_token.get_secret_value()
+        if request.url.path.startswith("/api/users/internal/users/"):
+            state["lookups"].append(request.url.path.rsplit("/", 1)[-1])
+            return httpx.Response(200, json={"name": "Alex" if request.url.path.endswith(identity["user_id"]) else "Sam"})
         return httpx.Response(state["status"], json={"target_count": 10})
 
     monkeypatch.setattr(routes.httpx, "Client", lambda **kwargs: real_client(transport=httpx.MockTransport(respond), **kwargs))
@@ -122,6 +126,11 @@ def test_challenge_leaderboard_checks_visibility_and_partition(
     result = client.get(path, headers=headers).json()
     assert result["target"] == 10
     assert [row["count"] for row in result["leaderboard"]] == [4, 2]
+    assert [row["name"] for row in result["leaderboard"]] == ["Sam", "Alex"]
+    assert sorted(state["lookups"]) == sorted([identity["user_id"], other_uid])
+    state["lookups"].clear()
+    assert client.get(path, headers=headers).status_code == 200
+    assert len(state["lookups"]) == 2  # Cache ends with the request.
     state["status"] = 404
     assert client.get(path, headers=headers).status_code == 404
     state["status"] = 503

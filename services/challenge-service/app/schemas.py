@@ -4,7 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Annotated, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator, model_validator
 
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Category = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
@@ -45,6 +45,12 @@ class InviteCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_ids: list[UUID] = Field(default_factory=list)
+    emails: list[EmailStr] = Field(default_factory=list)
+
+    @field_validator("emails")
+    @classmethod
+    def unique_emails(cls, values: list[EmailStr]) -> list[str]:
+        return list(dict.fromkeys(value.lower() for value in values))
 
     @field_validator("user_ids")
     @classmethod

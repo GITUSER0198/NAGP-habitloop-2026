@@ -228,6 +228,37 @@ def test_recipient_tenant_validation_is_atomic(
     assert len(client.get(f"{PREFIX}/invites", headers=peer).json()) == 1
 
 
+def test_email_invites_resolve_atomically_and_deduplicate(
+    client: TestClient, headers: dict[str, str], peer: dict[str, str], foreign: dict[str, str],
+    recipients: dict[str, Any], internal_headers: dict[str, str],
+) -> None:
+    challenge = create(client, headers, visibility="private")
+    recipients["emails"]["peer@example.com"] = peer["user_id"]
+    path = f"{PREFIX}/{challenge['id']}/invites"
+    for unknown in ("unknown@example.com", "foreign@example.com"):
+        response = client.post(path, headers=headers, json={"emails": ["peer@example.com", unknown]})
+        assert response.status_code == 404
+        assert unknown in response.json()["detail"]
+        assert client.get(f"{PREFIX}/invites", headers=peer).json() == []
+    assert client.post(path, headers=foreign, json={"emails": ["peer@example.com"]}).status_code == 404
+    assert client.post(path, headers=headers, json={"emails": ["bad-email"]}).status_code == 422
+    recipients["status"] = 503
+    assert client.post(path, headers=headers, json={"emails": ["peer@example.com"]}).status_code == 503
+    assert client.get(f"{PREFIX}/invites", headers=peer).json() == []
+    recipients["status"] = 200
+    response = client.post(path, headers=headers, json={
+        "emails": ["PEER@example.com", "peer@example.com"], "user_ids": [peer["user_id"]],
+    })
+    assert response.status_code == 200
+    assert response.json()["user_ids"] == [peer["user_id"]]
+    lookup = recipients["requests"][-1]
+    assert lookup.url.params["email"] == "peer@example.com"
+    assert lookup.headers["Authorization"] == headers["Authorization"]
+    assert lookup.headers["X-Internal-Token"] == internal_headers["X-Internal-Token"]
+    assert client.post(path, headers=headers, json={"emails": ["peer@example.com"]}).status_code == 200
+    assert len(client.get(f"{PREFIX}/invites", headers=peer).json()) == 1
+
+
 def test_active_internal_filters_dates_membership_category_and_tenant(
     client: TestClient, headers: dict[str, str], peer: dict[str, str], identity: dict[str, str],
     internal_headers: dict[str, str],

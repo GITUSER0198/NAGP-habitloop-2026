@@ -16,7 +16,7 @@ from habitloop_shared.db import get_db
 
 from app.models import Tenant, User
 from app.schemas import (
-    AuthResponse, LoginRequest, Profile, ProfilePatch, RegisterRequest, TenantLookup, tenant_slug,
+    AuthResponse, Email, LoginRequest, Profile, ProfilePatch, RegisterRequest, TenantLookup, tenant_slug,
 )
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -124,6 +124,19 @@ def update_me(body: ProfilePatch, identity: Identity, db: Database) -> User:
 def lookup_tenant(slug: str, db: Database) -> TenantLookup:
     tenant = db.scalar(select(Tenant).where(Tenant.slug == slug))
     return TenantLookup(exists=tenant is not None, name=None if tenant is None else tenant.name)
+
+
+@router.get(
+    "/internal/users", response_model=Profile, dependencies=[Depends(internal_only)],
+    include_in_schema=False,
+)
+def internal_user_by_email(email: Email, identity: Identity, db: Database) -> User:
+    user = db.scalar(select(User).where(
+        User.tenant_id == UUID(identity["tenant_id"]), User.email == email,
+    ))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 @router.get(
