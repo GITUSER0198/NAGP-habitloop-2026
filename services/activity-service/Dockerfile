@@ -7,6 +7,7 @@ RUN pip install /opt/habitloop-shared
 COPY services/activity-service/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt && useradd --create-home --uid 10001 habitloop
 COPY --chown=habitloop:habitloop services/activity-service/app ./app
+COPY --chown=habitloop:habitloop config/categories.json ./config/categories.json
 USER habitloop
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=45s --retries=5 \
