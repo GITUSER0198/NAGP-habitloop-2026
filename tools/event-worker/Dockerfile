@@ -7,6 +7,7 @@ RUN pip install /opt/habitloop-shared
 COPY tools/event-worker/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt && useradd --create-home --uid 10001 habitloop
 COPY --chown=habitloop:habitloop tools/event-worker/app ./app
+COPY --chown=habitloop:habitloop lambdas/event-normalizer/handler.py ./lambdas/event-normalizer/handler.py
 USER habitloop
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=5 \

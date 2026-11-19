@@ -1,11 +1,14 @@
-"""Local dispatch shell, with handlers added by subsequent pipeline tasks."""
+"""Local event dispatch using the same normalizer as AWS Lambda."""
 
+import importlib.util
 import logging
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
 
 from habitloop_shared.auth import internal_only
 from habitloop_shared.config import get_settings
@@ -30,6 +33,25 @@ class Event(BaseModel):
 
 def register_handler(detail_type: str, handler: Handler) -> None:
     handlers.setdefault(detail_type, []).append(handler)
+
+
+normalizer_path = next(
+    parent / "lambdas" / "event-normalizer" / "handler.py"
+    for parent in Path(__file__).resolve().parents
+    if (parent / "lambdas" / "event-normalizer" / "handler.py").is_file()
+)
+normalizer_spec = importlib.util.spec_from_file_location("event_normalizer", normalizer_path)
+if normalizer_spec is None or normalizer_spec.loader is None:
+    raise RuntimeError("Event normalizer could not be loaded")
+normalizer = importlib.util.module_from_spec(normalizer_spec)
+normalizer_spec.loader.exec_module(normalizer)
+
+
+async def normalize_partner(detail: dict[str, Any]) -> None:
+    await run_in_threadpool(normalizer.handler, detail, None)
+
+
+register_handler("PartnerEventReceived", normalize_partner)
 
 
 @app.get("/health")
