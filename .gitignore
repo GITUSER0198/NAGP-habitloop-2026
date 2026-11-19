@@ -10,3 +10,6 @@ dist/
 loader/
 www/
 .DS_Store
+
+# Local container data (Postgres, DynamoDB Local)
+data/

@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+# Generated or lock files: hidden from diffs so reviews do not spend tokens on them
+package-lock.json -diff linguist-generated
+pnpm-lock.yaml -diff linguist-generated
+*.lock -diff linguist-generated
+docs/api/*.json -diff linguist-generated
+*.drawio -diff
