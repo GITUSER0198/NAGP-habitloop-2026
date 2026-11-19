@@ -1,0 +1,28 @@
+@import '../../../theme/tokens.css';
+
+/* Tabler Icons (MIT). Only the three chunks used by the shared categories. */
+@font-face {
+  font-family: 'tabler-icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/tabler-icons.core.woff2') format('woff2');
+  unicode-range: U+EA39, U+F59F, U+EABE, U+EBF2;
+}
+@font-face {
+  font-family: 'tabler-icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/tabler-icons.sport.woff2') format('woff2');
+  unicode-range: U+EC82;
+}
+@font-face {
+  font-family: 'tabler-icons';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('./fonts/tabler-icons.shapes.woff2') format('woff2');
+  unicode-range: U+EFB1;
+}
+

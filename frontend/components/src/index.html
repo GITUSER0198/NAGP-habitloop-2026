@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HabitLoop component demo</title>
+    <link rel="stylesheet" href="/build/habitloop.css">
+    <link rel="stylesheet" href="/demo.css">
+    <script>
+      try {
+        if (localStorage.getItem('habitloop:mode') === 'light') document.documentElement.dataset.mode = 'light';
+      } catch { /* Use the default dark mode if storage is unavailable. */ }
+    </script>
+    <script type="module" src="/build/habitloop.esm.js"></script>
+  </head>
+  <body>
+    <main>
+      <header><div><h1>HabitLoop</h1><p class="demo-note">Midnight component library</p></div>
+        <button type="button" id="mode-toggle" aria-pressed="false">Use light mode</button></header>
+      <div class="demo-grid">
+        <hl-activity-summary id="morning-run" name="Morning run" category="fitness" preferred-time="07:30" status="done" streak="12"></hl-activity-summary>
+        <hl-activity-summary id="reflection" name="Evening reflection" category="mind" streak="3"></hl-activity-summary>
+        <hl-challenge-card id="walking" title="November walking club" visibility="public" participants="18" progress="65" target="100"></hl-challenge-card>
+        <hl-challenge-card id="invitation" title="Read every day" visibility="private" participants="4" progress="7" target="30" invited></hl-challenge-card>
+        <hl-partner-tile id="mockfit" provider="MockFit" linked last-event-at="2026-11-19T07:30:00" rejected-count="2"></hl-partner-tile>
+        <hl-partner-tile id="mockrun" provider="MockRun"></hl-partner-tile>
+        <hl-chart id="trend" type="trend" data='[{"label":"Mon","value":2},{"label":"Tue","value":4},{"label":"Wed","value":3},{"label":"Thu","value":6}]'></hl-chart>
+        <hl-chart id="bar" type="bar" data='[{"label":"Run","value":12},{"label":"Read","value":18},{"label":"Rest","value":4}]'></hl-chart>
+        <hl-heatmap id="year" class="wide"></hl-heatmap>
+        <hl-badge id="earned" days="7" earned earned-at="2026-11-12T07:30:00"></hl-badge>
+        <hl-badge id="locked" days="30" remaining="18"></hl-badge>
+        <hl-leaderboard id="leaders" class="wide"></hl-leaderboard>
+        <hl-reminder-banner id="reminders"></hl-reminder-banner>
+        <hl-recommendation-card id="suggestion" kind="timing" current="20:00" suggested="07:00" reason="You complete morning sessions more consistently. Try moving this activity to the morning for the coming week." confidence="0.87" status="pending"></hl-recommendation-card>
+        <hl-chart id="empty-chart" data="malformed"></hl-chart>
+        <hl-heatmap id="empty-heatmap" data="[]"></hl-heatmap>
+      </div>
+      <p class="demo-note">Actions emit events. This demo confirms them below without making service calls.</p>
+      <output id="events" aria-live="polite">Ready</output>
+    </main>
+    <script type="module">
+      const toggle = document.getElementById('mode-toggle');
+      function updateToggle() {
+        const light = document.documentElement.dataset.mode === 'light';
+        toggle.textContent = light ? 'Use dark mode' : 'Use light mode';
+        toggle.setAttribute('aria-pressed', String(light));
+      }
+      updateToggle();
+      toggle.addEventListener('click', () => {
+        const mode = document.documentElement.dataset.mode === 'light' ? 'dark' : 'light';
+        document.documentElement.dataset.mode = mode;
+        try { localStorage.setItem('habitloop:mode', mode); } catch { /* Storage is optional. */ }
+        updateToggle();
+      });
+      await Promise.all(['hl-heatmap', 'hl-leaderboard', 'hl-reminder-banner'].map(tag => customElements.whenDefined(tag)));
+      document.getElementById('year').data = Array.from({ length: 365 }, (_, index) => {
+        const date = new Date('2025-11-20T00:00:00Z');
+        date.setUTCDate(date.getUTCDate() + index);
+        return { date: date.toISOString().slice(0, 10), done: index % 4, completed: index % 3, missed: index % 7 === 0 ? 1 : 0 };
+      });
+      document.getElementById('leaders').rows = [
+        { name: 'Alex', count: 22, target: 30, isMe: false },
+        { name: 'You', count: 18, target: 30, isMe: true },
+        ...['Sam', 'Jo', 'Lee', 'Ray', 'Kim'].map((name, index) => ({ name, count: 17 - index, target: 30, isMe: false })),
+      ];
+      document.getElementById('reminders').items = [
+        { activityId: 'run', name: 'Morning run', dueAt: '07:30' },
+        { activityId: 'read', name: 'Read a chapter', dueAt: '21:00' },
+      ];
+      for (const name of ['hlLog', 'hlJoin', 'hlAccept', 'hlDecline', 'hlConnect', 'hlDisconnect', 'hlLogNow', 'hlSnooze', 'hlDismiss']) {
+        document.addEventListener(name, event => {
+          document.getElementById('events').textContent = `${event.target.id}: ${name} ${JSON.stringify(event.detail ?? {})}`;
+        });
+      }
+    </script>
+  </body>
+</html>

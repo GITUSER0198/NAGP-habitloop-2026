@@ -1,0 +1,8 @@
+/* Category glyphs from @tabler/icons-webfont 3.52.0 (MIT). */
+.ti { font-family: 'tabler-icons'; font-style: normal; font-weight: 400; line-height: 1; display: inline-block; }
+.ti-run::before { content: '\ec82'; }
+.ti-brain::before { content: '\f59f'; }
+.ti-book::before { content: '\ea39'; }
+.ti-heart::before { content: '\eabe'; }
+.ti-users::before { content: '\ebf2'; }
+.ti-circle-dot::before { content: '\efb1'; }

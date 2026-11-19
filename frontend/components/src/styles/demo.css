@@ -1,0 +1,9 @@
+body { margin: 0; padding: 2rem; background: var(--hl-bg); color: var(--hl-text); font-family: var(--hl-font); line-height: 1.5; }
+main { max-width: 70rem; margin: auto; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2rem; }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
+.wide { grid-column: 1 / -1; min-width: 0; }
+button { font: inherit; cursor: pointer; background: var(--hl-accent); color: var(--hl-accent-contrast); border: 1px solid var(--hl-accent); border-radius: var(--hl-radius); padding: 0.65rem 1rem; }
+button:focus-visible { outline: 2px solid var(--hl-text); outline-offset: 3px; }
+.demo-note { color: var(--hl-text-muted); }
+output { display: block; margin-top: 1rem; }
