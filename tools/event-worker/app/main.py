@@ -53,6 +53,20 @@ async def normalize_partner(detail: dict[str, Any]) -> None:
 
 register_handler("PartnerEventReceived", normalize_partner)
 
+analytics_path = normalizer_path.parent.parent / "analytics-updater" / "handler.py"
+analytics_spec = importlib.util.spec_from_file_location("analytics_updater", analytics_path)
+if analytics_spec is None or analytics_spec.loader is None:
+    raise RuntimeError("Analytics updater could not be loaded")
+analytics = importlib.util.module_from_spec(analytics_spec)
+analytics_spec.loader.exec_module(analytics)
+
+
+async def update_analytics(detail: dict[str, Any]) -> None:
+    await run_in_threadpool(analytics.handler, detail, None)
+
+
+register_handler("ActivityLogged", update_analytics)
+
 
 @app.get("/health")
 def health() -> dict[str, str]:

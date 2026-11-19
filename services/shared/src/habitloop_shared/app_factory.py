@@ -14,18 +14,20 @@ from habitloop_shared.db import initialize_database
 from habitloop_shared.logging import RequestIDMiddleware, configure_logging
 
 
-def create_app(name: str, prefix: str) -> FastAPI:
+def create_app(name: str, prefix: str, *, use_database: bool = True) -> FastAPI:
     settings = get_settings()
     configure_logging(name, settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        engine = await run_in_threadpool(initialize_database)
-        app.state.engine = engine
+        engine = await run_in_threadpool(initialize_database) if use_database else None
+        if engine is not None:
+            app.state.engine = engine
         try:
             yield
         finally:
-            engine.dispose()
+            if engine is not None:
+                engine.dispose()
 
     app = FastAPI(title=f"HabitLoop {name}", lifespan=lifespan)
     origins = [] if settings.web_port is None else [

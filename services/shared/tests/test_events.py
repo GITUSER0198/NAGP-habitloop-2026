@@ -23,7 +23,7 @@ def test_local_publish_posts_to_worker(monkeypatch: pytest.MonkeyPatch) -> None:
     async def handler(detail: dict[str, object]) -> None:
         handled.append(detail)
 
-    worker["register_handler"]("ActivityLogged", handler)
+    monkeypatch.setitem(worker["handlers"], "ActivityLogged", [handler])
     configure_logging("activity-service", "INFO")
     detail = {"tenant_id": str(uuid4()), "user_id": str(uuid4()), "log_id": str(uuid4())}
     received: list[httpx.Request] = []
