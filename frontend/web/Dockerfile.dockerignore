@@ -1,0 +1,17 @@
+**
+!frontend/
+!frontend/web/
+!frontend/web/**
+!frontend/components/
+!frontend/components/**
+!frontend/theme/
+!frontend/theme/tokens.css
+!config/
+!config/categories.json
+**/node_modules
+**/.svelte-kit
+**/build
+**/dist
+**/loader
+**/www
+**/data

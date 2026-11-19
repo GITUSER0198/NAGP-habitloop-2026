@@ -40,6 +40,29 @@ x-service: &service
   logging: *bounded-logging
 
 services:
+  web:
+    init: true
+    build:
+      context: .
+      dockerfile: frontend/web/Dockerfile
+    environment:
+      API_BASE_URL: http://gateway
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set and nonempty in .env}
+      HOST: 0.0.0.0
+      PORT: "47809"
+      ORIGIN: http://localhost:${WEB_PORT:?Set WEB_PORT in .env}
+    ports:
+      - "${WEB_PORT:?Set WEB_PORT in .env}:47809"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    logging: *bounded-logging
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:47809/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   postgres:
     image: postgres:16-alpine
     logging: *bounded-logging
