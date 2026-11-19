@@ -19,8 +19,8 @@ import requests
 def normalizer(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     monkeypatch.setenv("JWT_SECRET", secrets.token_urlsafe(64))
     monkeypatch.setenv("INTERNAL_TOKEN", secrets.token_urlsafe(32))
-    monkeypatch.setenv("INTEGRATION_SERVICE_URL", "http://integration-service:8000")
-    monkeypatch.setenv("ACTIVITY_SERVICE_URL", "http://activity-service:8000")
+    monkeypatch.setenv("INTEGRATION_SERVICE_URL", "http://integration-service:47820")
+    monkeypatch.setenv("ACTIVITY_SERVICE_URL", "http://activity-service:47820")
     path = Path(__file__).resolve().parents[1] / "handler.py"
     spec = importlib.util.spec_from_file_location("tested_normalizer", path)
     assert spec is not None and spec.loader is not None

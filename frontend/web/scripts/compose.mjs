@@ -13,7 +13,7 @@ const args = action === 'start' ? ['compose', 'up', '-d', '--no-deps', '--wait',
 const result = spawnSync('docker', args, { cwd, stdio: 'inherit' });
 if (result.status !== 0) process.exit(result.status ?? 1);
 if (action === 'start') {
-  const port = spawnSync('docker', ['compose', 'port', 'web', '8000'], { cwd, encoding: 'utf8' });
+  const port = spawnSync('docker', ['compose', 'port', 'web', '47809'], { cwd, encoding: 'utf8' });
   const published = port.stdout?.trim().split(':').at(-1);
   console.log(`HabitLoop is ready at http://localhost:${published}. Use npm run stop to stop the web app. Logs: docker compose logs web.`);
 } else console.log('HabitLoop web stopped.');

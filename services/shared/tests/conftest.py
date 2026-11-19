@@ -15,7 +15,7 @@ def configured_environment(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite:///:memory:")
     monkeypatch.setenv("DB_SCHEMA", "users")
     monkeypatch.setenv("EVENT_BUS_MODE", "local")
-    monkeypatch.setenv("EVENT_WORKER_URL", "http://event-worker:8000/events")
+    monkeypatch.setenv("EVENT_WORKER_URL", "http://event-worker:47820/events")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

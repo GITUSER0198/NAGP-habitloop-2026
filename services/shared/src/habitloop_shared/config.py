@@ -8,6 +8,9 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+SERVICE_PORT = 47820
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False, extra="ignore")
 
@@ -15,18 +18,19 @@ class Settings(BaseSettings):
     internal_token: SecretStr = Field(validation_alias="INTERNAL_TOKEN")
     database_url: SecretStr = Field(validation_alias="DATABASE_URL")
     db_schema: str = "public"
+    service_port: int = Field(default=SERVICE_PORT, ge=1, le=65535)
     event_bus_mode: Literal["local", "aws"] = "local"
     event_bus_name: str = "default"
-    event_worker_url: str = "http://event-worker:8000/events"
+    event_worker_url: str = f"http://event-worker:{SERVICE_PORT}/events"
     dynamodb_table: str = "habitloop-analytics"
     dynamodb_endpoint: str | None = None
     aws_region: str = "ap-south-1"
-    user_service_url: str = "http://user-service:8000"
-    activity_service_url: str = "http://activity-service:8000"
-    challenge_service_url: str = "http://challenge-service:8000"
-    integration_service_url: str = "http://integration-service:8000"
-    analytics_service_url: str = "http://analytics-service:8000"
-    recommendation_service_url: str = "http://recommendation-service:8000"
+    user_service_url: str = f"http://user-service:{SERVICE_PORT}"
+    activity_service_url: str = f"http://activity-service:{SERVICE_PORT}"
+    challenge_service_url: str = f"http://challenge-service:{SERVICE_PORT}"
+    integration_service_url: str = f"http://integration-service:{SERVICE_PORT}"
+    analytics_service_url: str = f"http://analytics-service:{SERVICE_PORT}"
+    recommendation_service_url: str = f"http://recommendation-service:{SERVICE_PORT}"
     log_level: str = "INFO"
     web_port: int | None = Field(default=None, ge=1, le=65535)
 

@@ -10,21 +10,22 @@ x-service-environment: &service-environment
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?Set POSTGRES_USER in .env}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB in .env}
   JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set and nonempty in .env}
   INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN must be set and nonempty in .env}
+  SERVICE_PORT: ${SERVICE_PORT:-47820}
   EVENT_BUS_MODE: ${EVENT_BUS_MODE:-local}
   EVENT_BUS_NAME: ${EVENT_BUS_NAME:-default}
-  EVENT_WORKER_URL: http://event-worker:8000/events
+  EVENT_WORKER_URL: http://event-worker:${SERVICE_PORT:-47820}/events
   DYNAMODB_TABLE: ${DYNAMODB_TABLE:-habitloop-analytics}
   DYNAMODB_ENDPOINT: http://dynamodb-local:8000
   AWS_REGION: ${AWS_REGION:-ap-south-1}
   # DynamoDB Local accepts these dummy credentials. AWS uses task-role credentials.
   AWS_ACCESS_KEY_ID: local
   AWS_SECRET_ACCESS_KEY: local
-  USER_SERVICE_URL: http://user-service:8000
-  ACTIVITY_SERVICE_URL: http://activity-service:8000
-  CHALLENGE_SERVICE_URL: http://challenge-service:8000
-  INTEGRATION_SERVICE_URL: http://integration-service:8000
-  ANALYTICS_SERVICE_URL: http://analytics-service:8000
-  RECOMMENDATION_SERVICE_URL: http://recommendation-service:8000
+  USER_SERVICE_URL: http://user-service:${SERVICE_PORT:-47820}
+  ACTIVITY_SERVICE_URL: http://activity-service:${SERVICE_PORT:-47820}
+  CHALLENGE_SERVICE_URL: http://challenge-service:${SERVICE_PORT:-47820}
+  INTEGRATION_SERVICE_URL: http://integration-service:${SERVICE_PORT:-47820}
+  ANALYTICS_SERVICE_URL: http://analytics-service:${SERVICE_PORT:-47820}
+  RECOMMENDATION_SERVICE_URL: http://recommendation-service:${SERVICE_PORT:-47820}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   WEB_PORT: ${WEB_PORT:?Set WEB_PORT in .env}
 
