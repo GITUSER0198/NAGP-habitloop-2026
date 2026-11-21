@@ -6,6 +6,6 @@
   "scripts": {
     "build": "npm run build -w @habitloop/shared && npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run build -w @habitloop/shared && npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run build -w @habitloop/shared && npm run build -w @habitloop/event-normalizer -w @habitloop/analytics-updater && npm run typecheck --workspaces --if-present"
   }
 }

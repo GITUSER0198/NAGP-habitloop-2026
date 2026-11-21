@@ -10,6 +10,7 @@
     "./auth": "./dist/auth.js",
     "./db": "./dist/db.js",
     "./events": "./dist/events.js",
+    "./event-input": "./dist/event-input.js",
     "./logger": "./dist/logger.js",
     "./app": "./dist/app.js"
   },
