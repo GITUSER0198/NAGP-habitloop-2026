@@ -13,3 +13,6 @@ www/
 
 # Local container data (Postgres, DynamoDB Local)
 data/
+
+# Generated Lambda packages (infra/scripts/package-lambdas.py)
+/*.zip

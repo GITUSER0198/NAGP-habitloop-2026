@@ -1,560 +1,151 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "HabitLoop integration-service",
-    "version": "0.1.0"
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {}
   },
   "paths": {
     "/api/integrations/health": {
       "get": {
-        "summary": "Health",
-        "operationId": "health_api_integrations_health_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Health Api Integrations Health Get"
-                }
-              }
-            }
+            "description": "Default Response"
           }
         }
       }
     },
     "/api/integrations/providers": {
       "get": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "Providers",
-        "operationId": "providers_api_integrations_providers_get",
         "responses": {
           "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
-                  "type": "array",
-                  "title": "Response Providers Api Integrations Providers Get"
-                }
-              }
-            }
+            "description": "Default Response"
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/integrations/links": {
-      "get": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "List Links",
-        "operationId": "list_links_api_integrations_links_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/LinkResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Links Api Integrations Links Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      },
       "post": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "Create Link",
-        "operationId": "create_link_api_integrations_links_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LinkCreate"
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "provider",
+                  "activity_map"
+                ],
+                "properties": {
+                  "provider": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "mockfit"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "mockrun"
+                        ]
+                      }
+                    ]
+                  },
+                  "activity_map": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LinkCreated"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "200": {
+            "description": "Default Response"
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
+        }
+      },
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Default Response"
           }
-        ]
+        }
       }
     },
     "/api/integrations/links/{id}": {
       "delete": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "Delete Link",
-        "operationId": "delete_link_api_integrations_links__id__delete",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string",
               "format": "uuid",
-              "title": "Id"
-            }
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
           }
         ],
         "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "200": {
+            "description": "Default Response"
           }
         }
       }
     },
     "/api/integrations/links/{id}/events": {
       "get": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "List Events",
-        "operationId": "list_events_api_integrations_links__id__events_get",
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string",
               "format": "uuid",
-              "title": "Id"
-            }
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
           }
         ],
         "responses": {
           "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/EventResponse"
-                  },
-                  "title": "Response List Events Api Integrations Links  Id  Events Get"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Default Response"
           }
         }
       }
     },
     "/api/integrations/ingest/{link_id}": {
       "post": {
-        "tags": [
-          "integrations"
-        ],
-        "summary": "Ingest",
-        "operationId": "ingest_api_integrations_ingest__link_id__post",
         "parameters": [
           {
-            "name": "link_id",
-            "in": "path",
-            "required": true,
             "schema": {
-              "type": "string",
               "format": "uuid",
-              "title": "Link Id"
-            }
-          },
-          {
-            "name": "X-HabitLoop-Signature",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Habitloop-Signature"
-            }
+              "type": "string"
+            },
+            "in": "path",
+            "name": "link_id",
+            "required": true
           }
         ],
         "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Ingest Api Integrations Ingest  Link Id  Post"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "200": {
+            "description": "Default Response"
           }
         }
       }
     }
   },
-  "components": {
-    "schemas": {
-      "EventResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "tenant_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Tenant Id"
-          },
-          "link_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Link Id"
-          },
-          "event_id": {
-            "type": "string",
-            "title": "Event Id"
-          },
-          "payload": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Payload"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "received",
-              "normalized",
-              "rejected"
-            ],
-            "title": "Status"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          },
-          "received_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Received At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "tenant_id",
-          "link_id",
-          "event_id",
-          "payload",
-          "status",
-          "reason",
-          "received_at"
-        ],
-        "title": "EventResponse"
-      },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "LinkCreate": {
-        "properties": {
-          "provider": {
-            "type": "string",
-            "enum": [
-              "mockfit",
-              "mockrun"
-            ],
-            "title": "Provider"
-          },
-          "activity_map": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Activity Map"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "provider",
-          "activity_map"
-        ],
-        "title": "LinkCreate"
-      },
-      "LinkCreated": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "tenant_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Tenant Id"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "mockfit",
-              "mockrun"
-            ],
-            "title": "Provider"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "activity_map": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Activity Map"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "ingest_key": {
-            "type": "string",
-            "title": "Ingest Key"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "tenant_id",
-          "user_id",
-          "provider",
-          "status",
-          "activity_map",
-          "created_at",
-          "ingest_key"
-        ],
-        "title": "LinkCreated"
-      },
-      "LinkResponse": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "tenant_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Tenant Id"
-          },
-          "user_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "User Id"
-          },
-          "provider": {
-            "type": "string",
-            "enum": [
-              "mockfit",
-              "mockrun"
-            ],
-            "title": "Provider"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "activity_map": {
-            "additionalProperties": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "object",
-            "title": "Activity Map"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "tenant_id",
-          "user_id",
-          "provider",
-          "status",
-          "activity_map",
-          "created_at"
-        ],
-        "title": "LinkResponse"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
-      }
-    },
-    "securitySchemes": {
-      "HTTPBearer": {
-        "type": "http",
-        "scheme": "bearer"
-      }
+  "servers": [
+    {
+      "url": "/"
     }
-  }
+  ]
 }

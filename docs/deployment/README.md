@@ -7,7 +7,7 @@ and [network diagram](../diagrams/network-architecture.md).
 
 ## 1. Prepare tools, credentials and variables
 
-Use Docker Desktop with Linux image builds, Python 3.12 with pip, Node.js 22 with npm, Git,
+Use Docker Desktop with Linux image builds, Node.js 22 with npm, Python 3.12 (standard library only, for the helper scripts), Git,
 `${PYTHON:-python3}`. These are OS alternatives, not two commands to run in sequence.
 
 Start in the repo root. Authenticate using your normal AWS credential chain or configured
@@ -58,14 +58,15 @@ data route table before proceeding. Initial RDS creation can take several minute
 
 Use the intended committed application revision in the checkout. The helper tags all seven
 images with the full `git rev-parse HEAD` SHA, builds `linux/amd64`, pushes to the seven immutable
-ECR repositories, then packages Linux CPython 3.12 dependencies for both Lambdas.
+ECR repositories, then builds the esbuild bundles and packages both Node.js 22 Lambdas.
 
 | Windows PowerShell | macOS |
 |---|---|
 | `./infra/scripts/build-push.ps1` | `sh infra/scripts/build-push.sh` |
 
 Expected progress: seven image builds/pushes, then Lambda packaging. Root artifacts must be
-`event-normalizer.zip` and `analytics-updater.zip`. They are generated binaries, not source;
+`event-normalizer.zip` and `analytics-updater.zip`, each holding one self-contained `handler.js`
+(Lambda handler `handler.handler`, runtime `nodejs22.x`). They are generated binaries, not source;
 do not stage them in Git. No image repository is needed for ZIP-based Lambdas.
 
 existing tag. The helper does not skip existing tags, so rerunning the same committed SHA or
@@ -167,7 +168,7 @@ tokens hidden. Screenshots are produced during the owner's AWS deployment task.
 | `11-dynamodb.png` | Analytics table name, PK/SK, on-demand capacity, tenant-qualified sample keys and `SEEN#` item without sensitive payloads |
 | `12-eventbridge-rules.png` | Custom bus with PartnerEventReceived and ActivityLogged source/type patterns and SQS targets; default-bus ECS STOPPED rule scoped to cluster |
 | `13-sqs.png` | Both input queues and DLQs: SSE, visibility 720 seconds, maxReceiveCount 3, queue policy restricted to matching EventBridge rule |
-| `14-lambda.png` | Both Python 3.12 x86_64 functions, 512 MiB/120 seconds, app subnets, matching SQS triggers, batch size 1 and ReportBatchItemFailures; hide environment values |
+| `14-lambda.png` | Both Node.js 22 x86_64 functions, 512 MiB/120 seconds, app subnets, matching SQS triggers, batch size 1 and ReportBatchItemFailures; hide environment values |
 | `15-secrets-manager.png` | Secret names/ARN references and RDS-managed credential metadata; never choose Retrieve secret value |
 | `16-iam-roles.png` | Per-service task roles, execution role and two Lambda roles; show scoped bus/table/queue permissions and trust policy |
 | `17-cloudfront-behaviors.png` | `/api/*` and default ALB behaviors with caching disabled; `/_app/*` and static file patterns to S3; HTTPS redirect and OAC origin |

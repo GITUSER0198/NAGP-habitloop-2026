@@ -32,7 +32,7 @@ export function getConfig(): AppConfig {
   cached = {
     jwtSecret: new TextEncoder().encode(jwtSecret),
     internalToken,
-    // Compose historically uses SQLAlchemy's driver-qualified URL. node-postgres wants a normal URI.
+    // Older env files carry a driver-qualified URL (postgresql+psycopg://). node-postgres wants a plain URI.
     databaseUrl: rawDatabaseUrl.replace(/^postgresql\+psycopg:\/\//, 'postgresql://').replace(/^postgres\+psycopg:\/\//, 'postgres://'),
     dbSchema,
     servicePort,

@@ -1,78 +1,61 @@
-"""Build Python 3.12 x86_64 Linux Lambda ZIPs in the project root."""
+"""Build the Node.js 22 Lambda ZIPs in the project root.
+
+Each ZIP holds one file, handler.js: the esbuild bundle (lambdas/<name>/dist/handler.js)
+with the shared library, jose and the AWS SDK clients inlined, so no node_modules ship.
+"""
 
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[2]
 FUNCTIONS = ("event-normalizer", "analytics-updater")
 
 
+def npm(*arguments: str) -> None:
+    executable = shutil.which("npm")
+    if executable is None:
+        raise SystemExit("Node.js 22 with npm must be on PATH to package the Lambdas.")
+    subprocess.run([executable, *arguments], cwd=ROOT, check=True)
+
+
+def build() -> None:
+    """Install if needed, then bundle the shared library and both handlers."""
+    if not (ROOT / "node_modules").is_dir():
+        npm("ci", "--no-audit", "--no-fund")
+    npm("run", "build", "-w", "@habitloop/shared")
+    for function in FUNCTIONS:
+        npm("run", "build", "-w", f"@habitloop/{function}")
+
+
 def package(function: str, output: Path) -> None:
-    """Resolve Linux wheels and add only shared source, dependencies and the handler."""
-    source = ROOT / "lambdas" / function
-    with tempfile.TemporaryDirectory(prefix="habitloop-lambda-") as directory:
-        staging = Path(directory) / "package"
-        requirements = Path(directory) / "requirements.txt"
-        requirements.write_text(
-            "\n".join(
-                line for line in (source / "requirements.txt").read_text(encoding="utf-8").splitlines()
-                if line.strip() != "habitloop-shared"
-            ) + "\n", encoding="utf-8", newline="\n",
-        )
-        subprocess.run(
-            [
-                sys.executable, "-m", "pip", "install", "--disable-pip-version-check",
-                "--no-compile", "--only-binary=:all:", "--platform", "manylinux2014_x86_64",
-                "--implementation", "cp", "--python-version", "3.12", "--abi", "cp312",
-                "--target", str(staging), "--requirement", str(requirements),
-                # The shared package is copied below; resolve its dependencies from metadata.
-                *shared_dependencies(function),
-            ],
-            check=True,
-        )
-        if function == "analytics-updater":
-            shutil.copytree(
-                ROOT / "services" / "shared" / "src" / "habitloop_shared",
-                staging / "habitloop_shared",
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
-            )
-        shutil.copy2(source / "handler.py", staging / "handler.py")
-        # Always replace just this function's prior build, atomically and without stale copies.
-        pending = output.with_suffix(".zip.part")
-        try:
-            with ZipFile(pending, "w", compression=ZIP_DEFLATED) as archive:
-                for path in sorted(staging.rglob("*")):
-                    if path.is_file() and "__pycache__" not in path.parts:
-                        info = ZipInfo(path.relative_to(staging).as_posix(), (2020, 1, 1, 0, 0, 0))
-                        info.compress_type = ZIP_DEFLATED
-                        info.external_attr = 0o644 << 16
-                        archive.writestr(info, path.read_bytes())
-            os.replace(pending, output)
-        finally:
-            pending.unlink(missing_ok=True)
-
-
-def shared_dependencies(function: str) -> list[str]:
-    """Keep the shared dependency list owned by its existing pyproject.toml."""
-    if function != "analytics-updater":
-        return []
-    import tomllib
-
-    with (ROOT / "services" / "shared" / "pyproject.toml").open("rb") as stream:
-        return list(tomllib.load(stream)["project"]["dependencies"])
+    bundle = ROOT / "lambdas" / function / "dist" / "handler.js"
+    if not bundle.is_file():
+        raise SystemExit(f"Missing {bundle}; the esbuild step did not produce it.")
+    # Replace only this function's prior build, atomically and without stale copies.
+    pending = output.with_suffix(".zip.part")
+    try:
+        with ZipFile(pending, "w", compression=ZIP_DEFLATED) as archive:
+            info = ZipInfo("handler.js", (2020, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            archive.writestr(info, bundle.read_bytes())
+        os.replace(pending, output)
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def main() -> None:
-    for index, function in enumerate(FUNCTIONS, start=1):
-        print(f"[{index} of {len(FUNCTIONS)}] Packaging {function} for Python 3.12 Linux", flush=True)
+    print("[1 of 3] Building the shared library and Lambda bundles", flush=True)
+    build()
+    for index, function in enumerate(FUNCTIONS, start=2):
+        print(f"[{index} of 3] Packaging {function} for Node.js 22", flush=True)
         package(function, ROOT / f"{function}.zip")
     print("Lambda packages ready in the project root.", flush=True)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

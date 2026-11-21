@@ -7,10 +7,12 @@ path contains spaces. Do not change the two registered host ports.
 ## Prerequisites
 
 - Docker Desktop, running with Linux containers and Docker Compose v2 supporting `up --wait`.
-- Python 3.12 on PATH as `python` in Windows PowerShell or `python3` on macOS. Seed, smoke and
-  wearable tools use only the standard library; local startup needs no host pip installation.
-- Node.js 22 and npm for frontend development or AWS asset deployment. Compose itself builds
-  with Node 22 and Python 3.12 inside containers, independent of host runtimes.
+- Python 3.12 on PATH as `python` in Windows PowerShell or `python3` on macOS, only for the seed,
+  smoke, wearable simulator and deployment helper scripts. They use only the standard library; there
+  is no host pip installation.
+- Node.js 22 and npm to run the backend tests (`npm ci`, `npm run typecheck`, `npm test` at the
+  root), for frontend development and for AWS asset deployment. Compose itself builds every service
+  with Node 22 inside containers, independent of host runtimes.
 - Git to obtain the checkout. Allow Docker enough memory for PostgreSQL, DynamoDB Local,
   six APIs, event-worker, gateway and web. Initial image pulls/builds need internet access.
 - Windows PowerShell 5.1 or newer. If script execution is restricted, use a process-scoped
@@ -113,7 +115,7 @@ Run the stop command only when you intend to stop HabitLoop. It retains `data/po
 |---|---|
 | Docker server unavailable | Open Docker Desktop and wait for the Linux engine. Repeat `docker version`. |
 | PowerShell says scripts are disabled | Use the process-scoped execution-policy command in prerequisites in that terminal. |
-| Python not found or Store alias opens | Install Python 3.12 with PATH support, disable the conflicting execution alias if needed, and open a new terminal. Helpers use `python` on Windows. |
+| Python not found or Store alias opens | Install Python 3.12 with PATH support, disable the conflicting execution alias if needed, and open a new terminal. Seed, smoke and simulator helpers use `python` on Windows. |
 | Port already allocated | Inspect `docker compose ps`. Reuse an existing HabitLoop instance or identify the other listener; do not change registered ports or stop another app blindly. |
 | Required variable missing | Check `.env` exists at the repo root and contains nonempty values. Use `docker compose config --quiet`; avoid printing expanded secrets. |
 | Startup timeout or unhealthy service | Run `docker compose ps` and `docker compose logs --tail 80`. Identify the failing service; image pulls/build time is separate from the health wait. |

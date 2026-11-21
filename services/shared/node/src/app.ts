@@ -52,9 +52,9 @@ export async function createApp(name: string, prefix: string): Promise<FastifyIn
   await app.register(swagger, { openapi: { info: { title: `HabitLoop ${name}`, version: '1.0.0' }, servers: [{ url: '/' }] } });
   await app.register(swaggerUi, { routePrefix: `${prefix}/docs`, uiConfig: { docExpansion: 'list' }, staticCSP: true });
   await app.register(async docs => { await docs.register(swaggerUi, { routePrefix: '/docs', uiConfig: { docExpansion: 'list' }, staticCSP: true }); });
-  app.get('/health', async () => ({ status: 'ok', service: name }));
+  app.get('/health', { schema: { hide: true } }, async () => ({ status: 'ok', service: name }));
   app.get(`${prefix}/health`, async () => ({ status: 'ok', service: name }));
-  app.get(`${prefix}/openapi.json`, async (_request, reply) => reply.send(app.swagger()));
+  app.get(`${prefix}/openapi.json`, { schema: { hide: true } }, async (_request, reply) => reply.send(app.swagger()));
   app.addHook('onReady', async () => initializeDatabase());
   app.addHook('onClose', closeDatabase);
   return app;

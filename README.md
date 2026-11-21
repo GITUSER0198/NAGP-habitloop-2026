@@ -2,8 +2,10 @@
 
 HabitLoop is a multi-tenant habit tracker and community challenge platform for NAGP Case Study 3.
 Users schedule activities, record progress, join challenges, import signed mock wearable workouts,
-and accept explainable schedule recommendations. Six Python 3.12 FastAPI services use SQLAlchemy 2
-and Pydantic v2. The frontend uses SvelteKit 2, Svelte 5 runes, and Stencil web components.
+and accept explainable schedule recommendations. Six Node.js 22 services use TypeScript, Fastify 5,
+Drizzle ORM over `pg` and TypeBox schemas, tested with Vitest. The frontend uses SvelteKit 2, Svelte 5
+runes, and Stencil web components. Python appears only in the seed, smoke, simulator and
+deployment helper scripts.
 
 Start with the [local setup](docs/setup.md), then follow the [user walkthrough](docs/walkthrough.md).
 AWS deployment and evidence capture are described in the [deployment guide](docs/deployment/README.md).
@@ -20,7 +22,7 @@ flowchart LR
     CF -->|HTTP 80, pages and APIs| ALB[ALB]
     ALB -->|HTTP 47809| Web
     Web -->|local gateway or AWS ALB| Router[nginx locally / ALB in AWS]
-    ALB -->|HTTP 47820| APIs[Six FastAPI services]
+    ALB -->|HTTP 47820| APIs[Six Fastify services]
     Router -->|HTTP 47820| APIs
     APIs --> PG[(PostgreSQL 16, service schemas)]
     APIs -->|publish| Bus[EventBridge]
@@ -58,7 +60,7 @@ and cannot be reached through nginx or the ALB.
 
 `RecommendationAccepted` is published but has no downstream EventBridge consumer in this build.
 Shared auth, database helpers, event publishing, analytics keys and logging live once in
-`services/shared` as `habitloop_shared`.
+`services/shared/node` as the npm workspace package `@habitloop/shared`.
 
 ## Manual log to dashboard
 
@@ -223,7 +225,8 @@ tenant context; CloudWatch aggregates metrics and sends alarms through SNS.
 ## Trade-offs and current limits
 
 - One RDS instance with separate schemas shares cost but also credentials and failure scope.
-  Table creation uses SQLAlchemy `create_all`, without versioned schema migrations.
+  Each service creates its own tables at startup with idempotent `CREATE TABLE IF NOT EXISTS`
+  statements, without versioned schema migrations.
 - Two AZs provide subnet placement for ECS and Lambda. A single NAT and single-AZ RDS reduce
   dev cost; neither provides full multi-AZ availability. One desired task per service may be in
   either app subnet; the diagram does not imply one replica in each AZ.
