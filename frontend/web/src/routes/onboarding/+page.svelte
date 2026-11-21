@@ -31,6 +31,26 @@
     if (next) community = next;
   }
   function setMode(next: string): void { mode = next; autoFill(); }
+
+  /** Register only: tell the person whether they join an existing community or create a new one. */
+  let status = $state('');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const name = community.trim();
+    if (mode !== 'register' || !name) { status = ''; return; }
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/onboarding/community?name=${encodeURIComponent(name)}`);
+        const result = await response.json() as { valid: boolean; exists?: boolean; name?: string | null };
+        if (name !== community.trim()) return;
+        status = !result.valid ? 'Use letters or numbers in the community name.'
+          : result.exists ? `You will join the ${result.name ?? name} community.`
+          : `A new community, ${name}, will be created.`;
+      } catch { status = ''; }
+    }, 400);
+    return () => clearTimeout(timer);
+  });
 </script>
 
 <svelte:head><title>Welcome | {app.name}</title></svelte:head>
@@ -65,10 +85,9 @@
       <label for="password">Password</label><input id="password" type="password" name="password" required autocomplete={mode === 'register' ? 'new-password' : 'current-password'} aria-invalid={!!errors.password} aria-describedby="password-error" />
       <small id="password-error" class="error">{errors.password ?? ''}</small>
       <label for="community">{app.strings.communityLabel}</label>
-      <div class="actions"><input id="community" name="tenant" required maxlength="200" bind:value={community} oninput={() => { touched = true; }} aria-invalid={!!errors.tenant} aria-describedby="community-error community-message" />
-        <button type="submit" formaction="?/community" formnovalidate class="secondary" disabled={busy}>Check community</button></div>
+      <input id="community" name="tenant" required maxlength="200" bind:value={community} oninput={() => { touched = true; }} aria-invalid={!!errors.tenant} aria-describedby="community-error community-message" />
       <small id="community-error" class="error">{errors.tenant ?? ''}</small>
-      <p id="community-message" class="muted">{form && 'tenantMessage' in form ? form.tenantMessage : app.strings.communityHint}</p>
+      <p id="community-message" class="muted" aria-live="polite">{mode === 'register' && status ? status : app.strings.communityHint}</p>
       {#if errors.timezone}<p class="error" role="alert">{errors.timezone}</p>{/if}
       <button type="submit" class="wide" disabled={busy}>{busy ? 'Submitting' : mode === 'register' ? 'Create account' : 'Log in'}</button>
       {#if busy}<Busy label="Checking your account" />{/if}

@@ -20,7 +20,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       event.cookies.delete(COOKIE, { path: '/' });
     }
   }
-  const publicRoute = event.url.pathname === '/onboarding' || event.url.pathname === '/health';
+  const publicRoute = event.url.pathname === '/onboarding' || event.url.pathname === '/onboarding/community' || event.url.pathname === '/health';
   if (!publicRoute && !event.locals.user) {
     if (event.url.pathname.startsWith('/api/')) return json({ message: 'Session expired' }, { status: 401 });
     redirect(303, token ? '/onboarding?message=expired' : '/onboarding');
