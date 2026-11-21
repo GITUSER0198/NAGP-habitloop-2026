@@ -4,8 +4,8 @@ HabitLoop is a multi-tenant habit tracker and community challenge platform for N
 Users schedule activities, record progress, join challenges, import signed mock wearable workouts,
 and accept explainable schedule recommendations. Six Node.js 22 services use TypeScript, Fastify 5,
 Drizzle ORM over `pg` and TypeBox schemas, tested with Vitest. The frontend uses SvelteKit 2, Svelte 5
-runes, and Stencil web components. Python appears only in the seed, smoke, simulator and
-deployment helper scripts.
+runes, and Stencil web components. The seed, smoke, simulator and deployment helper scripts are
+TypeScript run with `tsx` through npm, so Docker Desktop and Node 22 are the only prerequisites.
 
 Start with the [local setup](docs/setup.md), then follow the [user walkthrough](docs/walkthrough.md).
 AWS deployment and evidence capture are described in the [deployment guide](docs/deployment/README.md).

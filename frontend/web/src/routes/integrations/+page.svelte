@@ -14,7 +14,7 @@
   let busy = $state(false);
   let secret = $state<LinkSecret | null>(untrack(() => form && 'secret' in form ? form.secret ?? null : null));
   let copyMessage = $state('');
-  const command = $derived(secret ? `python tools/wearable-simulator/simulate.py --link-id ${secret.id} --key ${secret.ingest_key} --provider-activity ${secret.providerActivity} --count 3 --replay` : '');
+  const command = $derived(secret ? `npm run simulate -- --link-id ${secret.id} --key ${secret.ingest_key} --provider-activity ${secret.providerActivity} --count 3 --replay` : '');
   function forgetSecret(): void {
     secret = null;
     copyMessage = '';
@@ -61,7 +61,7 @@
     <h2>Save your ingest key</h2><p>This key disappears when you leave this page. Keep it somewhere private.</p>
     <label for="ingest-key">Ingest key</label><input id="ingest-key" readonly value={secret.ingest_key} autocomplete="off" />
     <button type="button" onclick={() => void copy(secret!.ingest_key)}>Copy key</button>
-    <p>Run this command from the project folder with Python installed. It sends three workouts and verifies replay handling. The simulator uses the gateway port from your environment, or the local default.</p>
+    <p>Run this command from the project folder (Node 22, after `npm ci`). It sends three workouts and verifies replay handling. The simulator uses the gateway port from your environment, or the local default.</p>
     <pre><code>{command}</code></pre><button type="button" onclick={() => void copy(command)}>Copy simulator command</button>
     <button type="button" class="secondary" onclick={forgetSecret}>Hide key</button>
     {#if copyMessage}<p role="status">{copyMessage}</p>{/if}

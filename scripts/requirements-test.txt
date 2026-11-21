@@ -1,2 +1,0 @@
-pytest>=8,<10
-openapi-spec-validator>=0.7,<0.9

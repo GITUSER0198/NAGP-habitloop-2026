@@ -1,7 +1,7 @@
 # Eight-minute demo script
 
 Target duration: **8:00**. This is the written part of deliverable 8; the owner records the video.
-Use the deployed CloudFront URL, a new walkthrough user, and seeded Alex. Follow the
+Use the deployed CloudFront URL, a new walkthrough user, and the seeded owner account (Dhruv Goel). Follow the
 [walkthrough](../walkthrough.md) for field values and expected screens. Keep credentials and
 the one-time ingest command off camera. Capture console evidence using the filenames in the
 [deployment checklist](../deployment/README.md#screenshot-checklist).
@@ -9,7 +9,7 @@ the one-time ingest command off camera. Capture console evidence using the filen
 the SNS subscription, and run seed and smoke against AWS. Have all console tabs open, filtered
 to `dg-habitloop` in the selected region, with resource detail tabs ready. Pre-enter nonsensitive
 form fields where useful; type passwords off camera. Keep CloudFront and IAM global screens
-ready separately. Ensure Alex's Morning run is at 8:00 PM with a pending 7:00 AM suggestion;
+ready separately. Ensure Dhruv's Morning run is at 8:00 PM with a pending 7:00 AM suggestion;
 reset that schedule and refresh if a previous run accepted it. Keep your fresh user's ingest key
 privately after linking; run the copied simulator command with `--gateway-url <CloudFront URL>`
 off camera. Keep screenshots of the completed configuration available if console navigation is
@@ -24,7 +24,7 @@ slow; state when showing a screenshot. Do not fabricate live metrics or claim lo
 | 1:35-1:55 | Dashboard | Show the live connection, counts, trend, heatmap and milestone badges. "Analytics updates asynchronously without a reload, with a polling fallback. Both done and completed count as success. A missed day breaks a streak. Analytics buckets are UTC." |
 | 1:55-2:20 | Challenges and challenge detail | Create Walk together with fitness category and current dates. Show owner participation, invite/code control and leaderboard. "Challenges are scoped to the tenant; private visibility also requires participation or invitation. New progress counts after joining." Log one additional completion if time permits, then reopen progress. |
 | 2:20-2:50 | Wearables, terminal output, Recent events | Map mockfit run to Evening walk and link off camera so the key is hidden. Execute three workouts plus replay off camera, show only progress output: 3 accepted and 3 duplicate. Refresh Recent events to show normalized rows, then show partner log source. "Raw events are stored first, then normalized. Replay creates no second log." |
-| 2:50-3:20 | Seeded Alex: Recommendations, accept, activity | Switch to Alex, Refresh suggestions, show timing reason/confidence and 8:00 PM to 7:00 AM. Accept, show New schedule and activity edit time. "The deterministic rule requires three attempts in each hour and a 15-point improvement. This uses seeded history; a new account has insufficient evidence. Accept changes the actual schedule and repeated accept is safe." |
+| 2:50-3:20 | Seeded Dhruv: Recommendations, accept, activity | Switch to dhruv.goel@nagarro.com, Refresh suggestions, show timing reason/confidence and 8:00 PM to 7:00 AM. Accept, show New schedule and activity edit time. "The deterministic rule requires three attempts in each hour and a 15-point improvement. This uses seeded history; a new account has insufficient evidence. Accept changes the actual schedule and repeated accept is safe." |
 | 3:20-3:40 | VPC resource map and Subnets | `01-vpc-subnets.png`: CIDR 10.20.0.0/16, two AZs, public 0/1, app 10/11 and data 20/21 /24s. "Private tasks and Lambda ENIs use the app subnets; the data subnet group contains a single-AZ RDS instance." |
 | 3:40-3:55 | Route tables and VPC endpoints | `02-route-tables*.png`, `22-vpc-endpoints.png`: public default IGW, app default one NAT, isolated data; S3 and DynamoDB Gateway endpoint routes. "Other AWS APIs use NAT. One NAT is a dev cost and availability trade-off." |
 | 3:55-4:15 | NACLs and Security groups | `03-nacls*.png`, `04-security-groups*.png`: stateless ephemeral replies, DB ingress app CIDRs on 5432; SG chain ALB to app 47809/47820 to DB 5432. Point at CloudFront prefix-list ingress and NAT /32 on ALB 80. |

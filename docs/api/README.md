@@ -18,21 +18,23 @@ They are excluded from the public specifications and collection.
 
 ## Demo and smoke walkthrough
 
-With Python 3.12 or newer, run from the repository root:
+With Node.js 22 and `npm ci` done once, run from the repository root:
 
 ```sh
-python tools/seed/seed.py
-python tools/seed/seed.py
+npm run seed -- --base-url http://localhost:47810
+npm run seed -- --base-url http://localhost:47810
 ```
 
 The seed uses public APIs only. It creates the `NAGP Demo` tenant (slug `nagp-demo`),
-`alex@example.com` (Alex Morgan) and `sam@example.com` (Sam Patel). `DEMO_PASSWORD`
+`dhruv.goel@nagarro.com` (Dhruv Goel) and the dummy users `testuser1@example.com`, `testuser2@example.com` and `testuser3@example.com`. `DEMO_PASSWORD`
 comes from the process environment, then `.env`, then the demo value in `.env.example`.
 Use that value to sign in. Existing accounts must have the same password.
 
-Alex owns Morning run and Read a chapter; Sam owns Park walk. The seed creates exactly
-30 historical logs per activity, a public movement challenge joined by Sam, a private
-reading challenge with Sam invited, and one mockfit link for Alex's run. Morning logs
+Dhruv Goel owns Morning run and Read a chapter; Test User 1 owns Park walk; Test Users 2 and 3
+own Evening stretch. The seed creates 30 historical logs for the first three activities and a
+few completions for Test Users 2 and 3, a public movement challenge joined by all three test
+users, a private reading challenge (Reading circle) with Test User 1 invited, and one mockfit
+link for Dhruv's run. Morning logs
 succeed consistently, while evening logs are mostly missed. Both profiles use UTC to make
 the stored history and aggregate hours reproducible. The run starts scheduled for 8:00 PM
 and gets a timing suggestion for 7:00 AM. The seed leaves suggestions pending for the demo.
@@ -55,9 +57,9 @@ sh infra/scripts/smoke.sh
 sh infra/scripts/smoke.sh https://your-gateway.example.com
 ```
 
-Both launchers run `infra/scripts/smoke.py` with the same checks. They also accept the
-`BASE_URL` environment variable and `PYTHON` to select a Python executable. No third-party
-Python packages are needed for seeding, smoking or exporting. Every smoke run creates a
+Both launchers run `npm run smoke` (`tools/smoke/src/smoke.ts`) with the same checks. They also
+accept the `BASE_URL` environment variable. Seeding, smoking and exporting need only Node.js 22
+and `npm ci`. Every smoke run creates a
 unique isolated tenant and retains its records for inspection. Each step prints PASS or
 FAIL; failures exit nonzero. Analytics and partner normalization are polled for up to
 90 seconds with elapsed progress. The walkthrough covers all log statuses, analytics,
@@ -67,9 +69,7 @@ refresh and repeated acceptance with a verified schedule update.
 ## OpenAPI export and validation
 
 ```sh
-python infra/scripts/export-openapi.py
-python -m pip install -r infra/scripts/requirements-test.txt
-python -m openapi_spec_validator docs/api/habitloop.openapi.json
+npm run export-openapi
 ```
 
 The exporter fetches all six service documents through the gateway before writing any

@@ -7,8 +7,7 @@ and [network diagram](../diagrams/network-architecture.md).
 
 ## 1. Prepare tools, credentials and variables
 
-Use Docker Desktop with Linux image builds, Node.js 22 with npm, Python 3.12 (standard library only, for the helper scripts), Git,
-`${PYTHON:-python3}`. These are OS alternatives, not two commands to run in sequence.
+Use Docker Desktop with Linux image builds, Node.js 22 with npm (the helper scripts are TypeScript run with `tsx`; run `npm ci` once), Git,
 
 Start in the repo root. Authenticate using your normal AWS credential chain or configured
 profile and check the intended account before provisioning:
@@ -73,7 +72,7 @@ existing tag. The helper does not skip existing tags, so rerunning the same comm
 resuming a partially pushed SHA can fail. Inspect repository state first; do not delete images
 or overwrite immutable tags as an automatic workaround. A new source revision needs a new
 committed SHA through the owner's normal reviewed workflow. Packaging just the ZIPs is available
-with `python infra/scripts/package-lambdas.py` (macOS: `python3`).
+with `npm run package-lambdas`.
 
 ## 4. Apply part 2: runtime
 
@@ -137,7 +136,7 @@ reusing an existing seeded environment. Use the CloudFront output as the base UR
 
 | Step | Windows PowerShell | macOS |
 |---|---|---|
-| Seed | `python tools/seed/seed.py --base-url $awsBase` | `python3 tools/seed/seed.py --base-url "$aws_base"` |
+| Seed | `npm run seed -- --base-url $awsBase` | `npm run seed -- --base-url "$aws_base"` |
 | Smoke | `./infra/scripts/smoke.ps1 -BASE_URL $awsBase` | `sh infra/scripts/smoke.sh "$aws_base"` |
 
 Expect six seed stages and all eight smoke steps PASS, including normalized partner delivery,

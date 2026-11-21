@@ -1,5 +1,5 @@
 #!/bin/sh
 set -eu
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+project_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 base_url=${1:-${BASE_URL:-http://localhost:47810}}
-exec "${PYTHON:-python3}" "$script_dir/smoke.py" --base-url "$base_url"
+exec npm --prefix "$project_root" run smoke --silent -- --base-url "$base_url"

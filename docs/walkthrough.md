@@ -2,7 +2,7 @@
 
 Complete the [local setup and seed](setup.md) first. The same pages work at the AWS CloudFront
 URL after deployment. This journey first uses a newly registered account to demonstrate the
-empty state, then switches to seeded Alex for a timing recommendation with sufficient history.
+empty state, then switches to the seeded owner account (Dhruv Goel) for a timing recommendation with sufficient history.
 No UI form backdates logs, so a new account cannot demonstrate the timing rule from three clicks.
 
 Save app screenshots under `docs/deployment/screenshots/` using the names below. These are
@@ -82,7 +82,7 @@ Open `/integrations` (Wearables in navigation). In the **mockfit** mapping form 
 The key appears once in **Save your ingest key** and disappears on navigation.
 
 Before leaving, copy the generated simulator command and run it in a terminal at the repository
-root. On macOS use `python3` instead of `python`. It sends three workouts and replays each
+root (Node 22, after `npm ci`; the command starts with `npm run simulate`). It sends three workouts and replays each
 exact body. For AWS append `--gateway-url` with your CloudFront HTTPS URL to that command;
 the generated command otherwise targets the local gateway. Do not record the key or command.
 
@@ -109,16 +109,16 @@ the same time. A timing suggestion needs at least three attempts at both the cur
 better hour, plus at least a 15-percentage-point success-rate advantage.
 
 Log out using the user menu. Log in with tenant **NAGP Demo** (or `nagp-demo`), email
-**alex@example.com** and the original `DEMO_PASSWORD` used by seed. Alex has **Morning run**
+**dhruv.goel@nagarro.com** and the original `DEMO_PASSWORD` used by seed. Dhruv has **Morning run**
 and **Read a chapter**, initially scheduled at **8:00 PM**, with 30 days of alternating
-successful 7:00 AM and mostly missed 8:00 PM UTC logs. Alex is a UTC user, making the
+successful 7:00 AM and mostly missed 8:00 PM UTC logs. Dhruv's seeded profile uses UTC, making the
 recommendation's UTC evidence and schedule hours align.
 
 Open `/recommendations` and choose **Refresh suggestions**. Expected screen: progress steps
 **Reading your history**, **Scoring time windows**, then **Done, N suggestions**; pending cards
 show current and suggested schedule, reason and confidence. Find the **Morning run** timing
 card suggesting **7:00 AM** instead of **8:00 PM**. Capture `app-08-timing-suggestion.png`.
-The default fresh seed has high timing confidence: Alex's two activities together supply
+The default fresh seed has high timing confidence: Dhruv's two activities together supply
 30 attempts in each hour window. Frequency suggestions
 may also appear because they use full completions in the last 14 days.
 
