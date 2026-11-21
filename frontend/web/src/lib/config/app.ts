@@ -16,9 +16,7 @@ export const app = {
     milestones: 'Streak milestones', history: 'All activities', cohorts: 'Weekly cohorts',
     unavailable: 'Unavailable', emptyToday: 'No activities scheduled today.',
     sessionExpired: 'Your session expired. Please log in again.',
-    logSaved: 'Activity logged.', activitySaved: 'Activity saved.',
-    communityLabel: 'Community',
-    communityHint: 'People in the same community share challenges and leaderboards.'
+    logSaved: 'Activity logged.', activitySaved: 'Activity saved.'
   },
   milestoneDays: [7, 30, 100],
   reminderWindowMinutes: 15

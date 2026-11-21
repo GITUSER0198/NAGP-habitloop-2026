@@ -12,15 +12,29 @@ Console evidence filenames are listed in the [deployment guide](deployment/READM
 
 ## 1. Register
 
-Open `/onboarding`, choose **Register**, enter tenant name **Walkthrough Team**, your name, a
-new email and a password. **Check tenant** reports whether the space exists. Choose **Create
-account**. If this email was already used in the tenant, use **Log in** or a new email. Registration
-joins an existing tenant when the tenant name resolves to its slug. The browser supplies your
-timezone.
+Open `/onboarding`, choose **Register**, enter your name, a new email and a password. There is no
+community field. Choose **Create account**. An email can register only once; if it is taken, use
+**Log in**. The browser supplies your timezone.
 
-Expected screen: `/dashboard` with the top navigation, no activities, a **New activity** button,
-empty trend/history and zero summary counts. Midnight dark is the default; the light/dark
-toggle persists locally. Screenshot: `app-01-registered-dashboard.png`.
+Expected screen: `/communities` with the welcome header "Create a community or join one to share
+challenges. You can also start right away in your Personal space." Under **Your communities** you
+see your private **Personal space**; **Discover** lists public communities with member counts.
+Screenshot: `app-01a-communities-welcome.png`.
+
+## 1b. Create or join a community, then switch
+
+In **Create a community** enter the name **Walkthrough Team** (3 to 60 characters) and a short
+description, then choose **Create community**. You become its owner and land on its `/dashboard`
+(top navigation, no activities, a **New activity** button, empty trend/history and zero summary
+counts). Midnight dark is the default; the light/dark toggle persists locally.
+Screenshot: `app-01-registered-dashboard.png`.
+
+To join instead, search under **Discover** and choose **Join** on a card. To move between
+communities, open the community switcher in the app bar (current name with a chevron; a check mark
+shows the active one), pick another community, or choose **Browse communities** or **Create
+community**. Each community has its own activities and challenges, so the page reloads with that
+community's data. **Leave** on a card removes you (not allowed for the Personal space or the last
+owner); leaving the active community returns you to the Personal space.
 
 ## 2. Create an activity
 
@@ -70,10 +84,12 @@ Capture `app-05-challenge-progress.png`. The challenge page is loaded on navigat
 leaderboard does not itself subscribe to the dashboard stream.
 
 Optional invitation evidence: create a private challenge and use **Invite or show code**.
-An empty participant email returns an eight-character code. A second user in the same tenant
-can choose **Join with code**. For a direct invitation, enter one existing same-tenant user email;
-that user sees **Pending invitations**, with accept and decline actions. Invitations are in-app,
-with no email delivery. A same-tenant outsider opening the private detail URL receives 404.
+An empty participant email returns an eight-character code. A second user in the same community
+can choose **Join with code**. For a direct invitation, enter the email of a member of this
+community; that user sees **Pending invitations**, with accept and decline actions. An email that
+is unknown or not a member of this community is refused with a clear message. Invitations are
+in-app, with no email delivery. A same-community outsider opening the private detail URL
+receives 404.
 
 ## 6. Send a wearable event and replay it
 
@@ -108,8 +124,8 @@ after **Refresh suggestions**. That is expected: all these manual logs were at e
 the same time. A timing suggestion needs at least three attempts at both the current and a
 better hour, plus at least a 15-percentage-point success-rate advantage.
 
-Log out using the user menu. Log in with tenant **NAGP Demo** (or `nagp-demo`), email
-**dhruv.goel@nagarro.com** and the original `DEMO_PASSWORD` used by seed. Dhruv has **Morning run**
+Log out using the user menu. Log in with email **dhruv.goel@nagarro.com** and the original `DEMO_PASSWORD` used by seed;
+you land in **NAGP Demo**, his last active community. Dhruv has **Morning run**
 and **Read a chapter**, initially scheduled at **8:00 PM**, with 30 days of alternating
 successful 7:00 AM and mostly missed 8:00 PM UTC logs. Dhruv's seeded profile uses UTC, making the
 recommendation's UTC evidence and schedule hours align.

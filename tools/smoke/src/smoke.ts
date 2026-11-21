@@ -63,14 +63,75 @@ export class Walkthrough {
     }
   }
 
+  readonly suffix = randomUUID().replaceAll('-', '');
+  community: Row = {};
+
+  /** Accounts need only name, email and password; the token starts in the private Personal space. */
   async register(): Promise<void> {
-    const suffix = randomUUID().replaceAll('-', '');
     const result = await this.call('POST', '/api/users/register', {
-      email: `smoke-${suffix}@example.com`, password: randomBytes(24).toString('base64url'),
-      name: 'Smoke Walker', tenant_name: `Smoke ${suffix}`, timezone: 'UTC',
+      email: `smoke-${this.suffix}@example.com`, password: randomBytes(24).toString('base64url'),
+      name: 'Smoke Walker', timezone: 'UTC',
     }, {}, 201);
     this.token = result.token;
-    check((await this.call('GET', '/api/users/me')).id === result.user.id, 'Profile does not match the new user');
+    check(result.community.kind === 'personal', 'A new account should start in the Personal space');
+    const me = await this.call('GET', '/api/users/me');
+    check(me.id === result.user.id, 'Profile does not match the new user');
+    check(me.community.kind === 'personal', 'Profile does not report the Personal space');
+  }
+
+  async createCommunity(): Promise<void> {
+    const result = await this.call('POST', '/api/users/communities', {
+      name: `Smoke ${this.suffix}`, description: 'Created by the smoke test',
+    }, {}, 201);
+    this.community = result.community;
+    this.token = result.token;
+    check(result.community.kind === 'community', 'The new community has the wrong kind');
+    const mine: Row[] = await this.call('GET', '/api/users/communities');
+    check(mine.some((row) => row.id === this.community.id && row.role === 'owner' && row.active), 'Community is not listed as active and owned');
+  }
+
+  /** Remove the test community so it never shows up under Discover. */
+  async cleanup(): Promise<void> {
+    const result = await this.call('DELETE', `/api/users/communities/${this.community.id}`);
+    this.token = result.token;
+    const discover: Row[] = await this.call('GET', '/api/users/communities/discover');
+    check(!discover.some((row) => row.id === this.community.id), 'Deleted community is still listed');
+  }
+
+  /** A second user who has not joined must not see the first community's data, and cannot switch into it. */
+  async isolation(): Promise<void> {
+    const ownerToken = this.token;
+    try {
+      const second = await this.call('POST', '/api/users/register', {
+        email: `smoke-two-${this.suffix}@example.com`, password: randomBytes(24).toString('base64url'),
+        name: 'Smoke Visitor', timezone: 'UTC',
+      }, {}, 201);
+      this.token = second.token;
+      check((await this.call('GET', '/api/activities')).length === 0, 'A non-member sees activities from another community');
+      for (const route of [`/api/activities/${this.activity.id}`, `/api/activities/${this.activity.id}/logs`]) {
+        let hidden = false;
+        try { await this.call('GET', route); } catch (error) {
+          if (!(error instanceof HttpError) || error.code !== 404) throw error;
+          hidden = true;
+        }
+        check(hidden, `A non-member could read ${route}`);
+      }
+      let refused = false;
+      try { await this.call('POST', '/api/users/switch', { community_id: this.community.id }); } catch (error) {
+        if (!(error instanceof HttpError) || error.code !== 403) throw error;
+        refused = true;
+      }
+      check(refused, 'A non-member could switch into the community');
+      const found: Row[] = await this.call('GET', `/api/users/communities/discover?q=${encodeURIComponent(String(this.community.name))}`);
+      check(found.some((row) => row.id === this.community.id), 'The community is not discoverable');
+      const joined = await this.call('POST', `/api/users/communities/${this.community.id}/join`);
+      this.token = joined.token;
+      check(joined.community.id === this.community.id, 'Joining did not switch to the community');
+      // Activities are private to their owner, so joining shares challenges and the leaderboard, not the owner's habits.
+      check((await this.call('GET', '/api/activities')).length === 0, 'A member can list the owner activities');
+    } finally {
+      this.token = ownerToken;
+    }
   }
 
   async createActivity(): Promise<void> {
@@ -168,14 +229,17 @@ async function main(): Promise<number> {
   });
   const walkthrough = new Walkthrough(values['base-url'] as string);
   const steps: Array<[string, () => Promise<void>]> = [
-    ['register', () => walkthrough.register()],
+    ['register (name, email, password only)', () => walkthrough.register()],
+    ['create a community', () => walkthrough.createCommunity()],
     ['create activity', () => walkthrough.createActivity()],
+    ['second user cannot read it before joining', () => walkthrough.isolation()],
     ['log done/missed/completed', () => walkthrough.logStatuses()],
     ['read analytics', () => walkthrough.analytics()],
     ['link integration', () => walkthrough.linkIntegration()],
     ['simulate signed event and replay', () => walkthrough.simulate()],
     ['refresh recommendation', () => walkthrough.refresh()],
     ['accept recommendation', () => walkthrough.accept()],
+    ['delete the test community', () => walkthrough.cleanup()],
   ];
   for (const [index, [label, action]] of steps.entries()) {
     console.log(`${index + 1} of ${steps.length}: ${label}`);

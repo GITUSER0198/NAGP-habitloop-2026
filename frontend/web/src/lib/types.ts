@@ -1,5 +1,8 @@
 export type Status = 'done' | 'completed' | 'missed';
 export interface User { id: string; tenant_id: string; name: string; email: string }
+export interface CommunityRef { id: string; name: string; kind: 'personal' | 'community' }
+export interface MyCommunity extends CommunityRef { description: string; role: 'owner' | 'member'; member_count: number; active: boolean }
+export interface DiscoverCommunity { id: string; name: string; description: string; member_count: number }
 export interface Activity {
   id: string;
   name: string;

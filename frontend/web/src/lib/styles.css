@@ -40,6 +40,27 @@ nav { display: flex; flex: 1; align-items: center; gap: 0.25rem; min-width: 0; m
 .user-panel p { margin: 0 0 0.25rem; }
 .user-panel .user-name { font-weight: 700; }
 .user-panel form { margin-top: 0.75rem; }
+/* Community switcher */
+.community-menu { position: relative; }
+.switcher { max-width: 14rem; min-height: 2.5rem; padding: 0.25rem 0.75rem; background: var(--hl-accent-container); color: var(--hl-on-accent-container); box-shadow: none; font-size: 0.9rem; }
+.switcher-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-panel { position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 40; min-width: 16rem; max-width: calc(100vw - 2rem); padding: 0.5rem; background: var(--hl-surface); border: 1px solid var(--hl-border); border-radius: var(--hl-radius-card); box-shadow: var(--hl-elev-4); }
+.menu-panel form { margin: 0; }
+.menu-panel hr { border: 0; border-top: 1px solid var(--hl-border); margin: 0.4rem 0; }
+.menu-item, .menu-link { display: flex; width: 100%; justify-content: flex-start; align-items: center; gap: 0.5rem; min-height: 2.5rem; padding: 0.4rem 0.75rem; border-radius: var(--hl-radius); background: transparent; color: var(--hl-text); box-shadow: none; font-weight: 500; text-align: left; text-decoration: none; }
+.menu-item:hover:not(:disabled), .menu-link:hover { background: color-mix(in srgb, var(--hl-text) 8%, transparent); box-shadow: none; filter: none; }
+.menu-item[aria-current] { background: var(--hl-accent-container); color: var(--hl-on-accent-container); font-weight: 700; }
+.menu-check { display: inline-flex; width: 1.25rem; flex: none; }
+.menu-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Communities page */
+.community-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; }
+.community-card { display: flex; flex-direction: column; gap: 0.25rem; }
+.community-card .card-head { margin-bottom: 0.25rem; }
+.community-card .actions, .community-card > form { margin-top: auto; padding-top: 0.5rem; }
+.community-card.is-active { border-color: var(--hl-accent); }
+.community-card h3 { overflow-wrap: anywhere; }
+.search-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.search-row input { flex: 1; }
 /* Mid widths: icon-only nav, the selected item keeps its label */
 @media (min-width: 900px) and (max-width: 1099px) {
   .nav-link:not([aria-current]) .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
@@ -156,6 +177,7 @@ hl-reminder-banner { margin-bottom: 1.5rem; }
   .card { padding: 16px; }
   .hero { padding: 20px; }
   .wordmark { display: none; }
+  .switcher { max-width: 8rem; }
   .auth-card { padding: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {

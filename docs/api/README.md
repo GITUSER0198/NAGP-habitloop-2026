@@ -13,7 +13,7 @@ The gateway defaults to `http://localhost:47810`. Public documentation is availa
 | Recommendations | <http://localhost:47810/api/recommendations/docs> | `recommendation-service.openapi.json` |
 
 Each UI reads `/api/<service-route>/openapi.json` through the gateway. Internal endpoints
-require both service authentication and a tenant bearer token and are blocked at the gateway.
+require both service authentication and a bearer token for the active community and are blocked at the gateway.
 They are excluded from the public specifications and collection.
 
 ## Demo and smoke walkthrough
@@ -25,7 +25,7 @@ npm run seed -- --base-url http://localhost:47810
 npm run seed -- --base-url http://localhost:47810
 ```
 
-The seed uses public APIs only. It creates the `NAGP Demo` tenant (slug `nagp-demo`),
+The seed uses public APIs only. It creates the public communities `NAGP Demo`, `Morning Runners` and `Book Club`,
 `dhruv.goel@nagarro.com` (Dhruv Goel) and the dummy users `testuser1@example.com`, `testuser2@example.com` and `testuser3@example.com`. `DEMO_PASSWORD`
 comes from the process environment, then `.env`, then the demo value in `.env.example`.
 Use that value to sign in. Existing accounts must have the same password.
@@ -60,7 +60,7 @@ sh infra/scripts/smoke.sh https://your-gateway.example.com
 Both launchers run `npm run smoke` (`tools/smoke/src/smoke.ts`) with the same checks. They also
 accept the `BASE_URL` environment variable. Seeding, smoking and exporting need only Node.js 22
 and `npm ci`. Every smoke run creates a
-unique isolated tenant and retains its records for inspection. Each step prints PASS or
+unique community and retains its records for inspection. Each step prints PASS or
 FAIL; failures exit nonzero. Analytics and partner normalization are polled for up to
 90 seconds with elapsed progress. The walkthrough covers all log statuses, analytics,
 HMAC partner ingest, replay deduplication, invalid signature rejection, recommendation
@@ -83,14 +83,17 @@ Run the exporter again after API changes. For AWS, set `BASE_URL` or pass
 1. Import `HabitLoop.postman_collection.json` and `HabitLoop.local.postman_environment.json`.
 2. Select the **HabitLoop local** environment. Set `password` to your `DEMO_PASSWORD` value.
    Set `base_url` to the gateway URL for local or AWS use.
-3. In **User Service**, send **Login**. It stores the bearer token in the collection's
-   `token` variable. Protected requests inherit collection authentication. Register also
-   saves its token, and uses the environment email, name and tenant name.
+3. In **User Service**, send **Login** (email and password only). It stores the bearer token in
+   the collection's `token` variable for your last active community. Protected requests inherit
+   collection authentication. Register also saves its token (for your Personal space). **My
+   Communities**, **Discover Communities**, **Create Community**, **Join Community**, **Leave
+   Community** and **Switch Community** manage memberships; the last four save a new token, and
+   Create Community also saves `community_id`.
 4. Browse the folders for all six services. Activity and challenge creation save
    `activity_id` and `challenge_id`. Set those collection variables to existing demo IDs
    when inspecting seeded records. Adjust `challenge_start_date`, `challenge_end_date`
    and `started_at` in the environment for your walkthrough dates. Invites accept `emails`, with no invitation saved if
-   any address is unknown in the tenant.
+   any address is unknown or not a member of the active community.
 5. Creating a link saves `link_id` and its one-time `ingest_key`. The ingest request signs
    its exact body in a pre-request script using Postman's Web Crypto support
    ([sandbox reference](https://learning.postman.com/v11/docs/tests-and-scripts/write-scripts/postman-sandbox-reference/pm-require)). Set `event_id`

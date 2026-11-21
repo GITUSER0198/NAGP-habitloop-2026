@@ -40,16 +40,16 @@ async function api(path, body, token) {
 }
 
 try {
-  console.log('1 of 8: register, community check and cookie');
+  console.log('1 of 8: register, create a community and cookie');
   await page.goto(`${web}/onboarding`);
   await page.waitForFunction(() => !!customElements.get('hl-chart'));
-  await page.getByLabel('Community', { exact: true }).fill(tenant);
-  await page.getByRole('button', { name: 'Check community', exact: true }).click();
-  await page.getByText('A new community will be created when you register.').waitFor();
   await page.getByLabel('Your name', { exact: true }).fill('Web acceptance');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.waitForURL('**/communities?welcome=1');
+  await page.getByLabel('Name', { exact: true }).fill(tenant);
+  await page.getByRole('button', { name: 'Create community', exact: true }).click();
   await page.waitForURL('**/dashboard');
   const cookie = (await context.cookies()).find(item => item.name === 'habitloop_session');
   assert.ok(cookie?.httpOnly);
@@ -152,7 +152,6 @@ try {
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await page.waitForURL('**/onboarding');
   await page.getByRole('button', { name: 'Log in', exact: true }).first().click();
-  await page.getByLabel('Community', { exact: true }).fill(tenant);
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).last().click();
@@ -160,7 +159,7 @@ try {
 
   console.log('7 of 8: cross-tenant activity is hidden and returns 404');
   const otherContext = await browser.newContext();
-  const other = await api('/api/users/register', { tenant_name: `Other ${suffix}`, name: 'Other tenant', email, password });
+  const other = await api('/api/users/register', { name: 'Other user', email: `other-${email}`, password });
   await otherContext.addCookies([{ name: 'habitloop_session', value: other.token, url: web, httpOnly: true, sameSite: 'Lax' }]);
   const otherPage = await otherContext.newPage();
   await otherPage.goto(`${web}/dashboard`);

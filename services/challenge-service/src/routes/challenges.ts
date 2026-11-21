@@ -51,8 +51,8 @@ async function validateUsers(ids: string[], request: FastifyRequest): Promise<vo
 async function resolveEmails(emails: string[], request: FastifyRequest): Promise<string[]> {
   const ids: string[] = [];
   for (const email of emails) {
-    const response = await userLookup(request, `/api/users/internal/users?email=${encodeURIComponent(email)}`);
-    if (response.status === 404) fail(404, `No participant found for ${email}`);
+    const response = await userLookup(request, `/api/users/internal/users?email=${encodeURIComponent(email)}&tenant_id=${encodeURIComponent(request.user!.tenantId)}`);
+    if (response.status === 404) fail(422, `${email} is not a member of this community, so they cannot be invited`);
     if (!response.ok) fail(503, 'Invite recipients could not be verified');
     try { const value = await response.json() as { id?: unknown }; if (typeof value?.id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value.id)) throw new Error('Invalid user id'); ids.push(value.id.toLowerCase()); } catch { fail(503, 'Invite recipients could not be verified'); }
   }

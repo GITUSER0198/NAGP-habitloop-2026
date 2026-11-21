@@ -56,22 +56,26 @@ should exit successfully with code 0. SQL schemas are created by their services 
 | Step | Windows PowerShell | macOS |
 |---|---|---|
 | Install script dependencies, first time only | `npm ci` | `npm ci` |
-| Seed demo tenant and history | `npm run seed -- --base-url http://localhost:47810` | `npm run seed -- --base-url http://localhost:47810` |
+| Seed demo communities and history | `npm run seed -- --base-url http://localhost:47810` | `npm run seed -- --base-url http://localhost:47810` |
 | Run end-to-end checks | `./infra/scripts/smoke.ps1 -BASE_URL http://localhost:47810` | `sh infra/scripts/smoke.sh http://localhost:47810` |
 
 Seed prints six stages, including progress through the historical logs and waiting for timing
-suggestions. It creates tenant **NAGP Demo** (`nagp-demo`), the owner account
-**dhruv.goel@nagarro.com** and dummy users **testuser1@example.com**, **testuser2@example.com** and
-**testuser3@example.com**, five activities, two challenges and a mockfit mapping. Login uses the
+suggestions. It creates the public communities **NAGP Demo** (owner Dhruv, all test users join),
+**Morning Runners** (owner Test User 1, Test User 2 joins) and **Book Club** (owner Test User 3),
+the owner account **dhruv.goel@nagarro.com** and dummy users **testuser1@example.com**,
+**testuser2@example.com** and **testuser3@example.com**. The activities, history, two challenges
+and mockfit mapping live in NAGP Demo, which is Dhruv's last active community, so Discover
+shows the other two. Every account also has a private Personal space. Login uses the
 `DEMO_PASSWORD` from `.env`; `.env.example` contains the local demonstration default. The seed
 reads that setting from environment first, then `.env`. Changing it after seeding does not change
 existing users' passwords. Repeated seed runs reuse named records and historical timestamps.
 An old ended challenge is not renewed automatically. The seed-created link's one-time key is
 not printed; use the fresh-link flow in the walkthrough for the simulator.
 
-Smoke creates a separate randomly named tenant on each run. Expect **8 of 8 steps with PASS**:
-registration, activity, status logs, analytics, integration link, signed workout and replay,
-recommendation refresh and repeated accept. It checks bad HMAC rejection, one partner log,
+Smoke registers a fresh user and creates a separate randomly named community on each run. Expect
+**11 of 11 steps with PASS**: registration (name, email, password only), community creation, activity,
+a second user who cannot read the community's data until it joins, status logs, analytics, integration link, signed workout and replay,
+recommendation refresh, repeated accept, and deleting its test community so it never appears under Discover. It checks bad HMAC rejection, one partner log,
 365 heatmap rows and a schedule change to `07:00`. Analytics waits are bounded to 90 seconds.
 Smoke leaves its records for inspection and does not delete data.
 
@@ -83,6 +87,7 @@ and form actions because the configured web origin is `http://localhost:47809`.
 | Page or service | URL |
 |---|---|
 | Register or login | <http://localhost:47809/onboarding> |
+| Communities (create, browse, join, switch) | <http://localhost:47809/communities> |
 | Dashboard | <http://localhost:47809/dashboard> |
 | Challenges | <http://localhost:47809/challenges> |
 | Wearables | <http://localhost:47809/integrations> |

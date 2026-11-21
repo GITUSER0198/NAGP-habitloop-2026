@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from './$types';
-import type { TodayItem } from '$lib/types';
+import type { MyCommunity, TodayItem } from '$lib/types';
 import { api, ApiError, pageError } from '$lib/server/api';
 import { features } from '$lib/config/features';
 import type { Challenge, RecommendationList } from './community';
@@ -16,7 +16,15 @@ export const load: LayoutServerLoad = async (event) => {
       if (result.reason instanceof ApiError) return null;
       throw result.reason;
     });
+    // The switcher needs my communities; the app still works (without it) if this call fails.
+    let communities: MyCommunity[] = [];
+    if (event.locals.user) {
+      try { communities = await api<MyCommunity[]>(event, '/api/users/communities'); }
+      catch (cause) { if (!(cause instanceof ApiError)) throw cause; }
+    }
     return {
+      communities,
+      community: communities.find(item => item.id === event.locals.user?.tenant_id) ?? null,
       pendingInvites,
       pendingRecommendations,
       user: event.locals.user,

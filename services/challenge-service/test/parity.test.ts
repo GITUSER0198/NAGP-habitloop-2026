@@ -41,7 +41,7 @@ describe('Python challenge contract parity', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, options) => {
       const url = new URL(String(input)); requests.push({ url, headers: new Headers(options?.headers) });
       if (lookupStatus !== 200) return Response.json({}, { status: lookupStatus });
-      if (url.searchParams.has('email')) { const id = emails.get(url.searchParams.get('email')!); return Response.json(emailPayload ?? (id ? { id, tenant_id: tenant } : {}), { status: id ? 200 : 404 }); }
+      if (url.searchParams.has('email')) { const id = url.searchParams.get('tenant_id') === tenant ? emails.get(url.searchParams.get('email')!) : undefined; return Response.json(emailPayload ?? (id ? { id, tenant_id: tenant } : {}), { status: id ? 200 : 404 }); }
       return Response.json({}, { status: missing.has(url.pathname.split('/').at(-1)!) ? 404 : 200 });
     });
   });
@@ -144,13 +144,19 @@ describe('Python challenge contract parity', () => {
   });
   it('resolves email invites atomically, case-insensitively, deduplicating both inputs', async () => {
     const challenge = await create({ visibility: 'private' }); const path = `/${challenge.id}/invites`;
-    for (const email of ['unknown@example.com', 'foreign@example.com']) { const result = await call('POST', path, { emails: ['peer@example.com', email] }); expect(result.statusCode).toBe(404); expect(result.json().detail).toContain(email); expect((await call('GET', '/invites', undefined, peerAuth)).json()).toEqual([]); }
+    for (const email of ['unknown@example.com', 'foreign@example.com']) { const result = await call('POST', path, { emails: ['peer@example.com', email] }); expect(result.statusCode).toBe(422); expect(result.json().detail).toContain(email); expect((await call('GET', '/invites', undefined, peerAuth)).json()).toEqual([]); }
     expect((await call('POST', path, { emails: ['peer@example.com'] }, foreign)).statusCode).toBe(404);
     expect((await call('POST', path, { emails: ['bad-email'] })).statusCode).toBe(422);
     lookupStatus = 503; expect((await call('POST', path, { emails: ['peer@example.com'] })).statusCode).toBe(503); expect((await call('GET', '/invites', undefined, peerAuth)).json()).toEqual([]);
     lookupStatus = 200; const result = await invite(challenge.id, { emails: ['PEER@example.com', 'peer@example.com'], user_ids: [peer] }); expect(result.user_ids).toEqual([peer]);
-    const lookup = requests.at(-1)!; expect(lookup.url.searchParams.get('email')).toBe('peer@example.com'); expect(lookup.headers.get('authorization')).toBe(auth.authorization); expect(lookup.headers.get('x-internal-token')).toBe(secret['x-internal-token']);
+    const lookup = requests.at(-1)!; expect(lookup.url.searchParams.get('email')).toBe('peer@example.com'); expect(lookup.url.searchParams.get('tenant_id')).toBe(tenant); expect(lookup.headers.get('authorization')).toBe(auth.authorization); expect(lookup.headers.get('x-internal-token')).toBe(secret['x-internal-token']);
     await invite(challenge.id, { emails: ['peer@example.com'] }); expect((await call('GET', '/invites', undefined, peerAuth)).json()).toHaveLength(1);
+  });
+  it('rejects an email invite for a user who is not a member of this community with a clear 422', async () => {
+    const challenge = await create({ visibility: 'private' });
+    const result = await call('POST', `/${challenge.id}/invites`, { emails: ['outsider@example.com'] });
+    expect(result.statusCode).toBe(422); expect(result.json().detail).toBe('outsider@example.com is not a member of this community, so they cannot be invited');
+    expect(requests.at(-1)!.url.searchParams.get('tenant_id')).toBe(tenant); expect((await call('GET', '/invites', undefined, peerAuth)).json()).toEqual([]);
   });
   it.each([{}, { id: 'invalid' }, { id: null }])('fails malformed email lookup %j without partial invites', async payload => {
     const challenge = await create(); emailPayload = payload;

@@ -1,6 +1,6 @@
 # HabitLoop
 
-HabitLoop is a multi-tenant habit tracker and community challenge platform for NAGP Case Study 3.
+HabitLoop is a habit tracker and community challenge platform (every community is a tenant) for NAGP Case Study 3.
 Users schedule activities, record progress, join challenges, import signed mock wearable workouts,
 and accept explainable schedule recommendations. Six Node.js 22 services use TypeScript, Fastify 5,
 Drizzle ORM over `pg` and TypeBox schemas, tested with Vitest. The frontend uses SvelteKit 2, Svelte 5
@@ -51,7 +51,7 @@ and cannot be reached through nginx or the ALB.
 
 | Service and prefix | Responsibility | Data store | Events in / out | Key endpoints |
 |---|---|---|---|---|
-| User, `/api/users` | Tenant registration, login, profile and timezone | PostgreSQL `users` | None / none | `POST /register`, `POST /login`, `GET/PATCH /me`, `GET /tenants/{slug}` |
+| User, `/api/users` | Accounts, login, profile, communities and memberships | PostgreSQL `users` | None / none | `POST /register`, `POST /login`, `GET/PATCH /me`, `GET/POST /communities`, `GET /communities/discover`, `POST /communities/{id}/join`, `POST /communities/{id}/leave`, `POST /switch` |
 | Activity, `/api/activities` | Activity schedules, manual logs and partner log deduplication | PostgreSQL `activities` | Normalizer calls internal HTTP / `ActivityLogged` | `GET/POST` prefix, `GET /today`, `GET/PATCH/DELETE /{id}`, `GET/POST /{id}/logs`, internal log and schedule routes |
 | Challenge, `/api/challenges` | Tenant challenge feed, visibility, participation and invitations | PostgreSQL `challenges` | None / none | `POST` prefix, `GET /feed`, `GET /invites`, `GET /{id}`, `POST /{id}/join`, `POST /join-by-code`, `POST /{id}/invites`, invite accept/decline and leave |
 | Integration, `/api/integrations` | Provider mapping, per-link key, raw workout storage and ingest | PostgreSQL `integrations` | Normalizer updates event state over internal HTTP / `PartnerEventReceived` | `GET /providers`, `GET/POST /links`, `DELETE /links/{id}`, `GET /links/{id}/events`, `POST /ingest/{link_id}` |
@@ -179,10 +179,15 @@ return 502 so the user can retry.
 
 ## Multi-tenancy
 
-Registration creates or joins a tenant using a slug derived from its name. Login requires tenant
-slug and email; the same email may exist in different tenants. JWT claims carry `sub`, `tenant_id`,
-`email`, and `name`. Resource queries use the token's tenant and, for personal resources, user.
-Foreign-tenant resource IDs return 404. Private challenges also enforce invitation/participant
+Accounts are global: sign-up takes name, email and password, login takes email and password, and
+an email can register only once. A community is a tenant. A user belongs to many communities
+through memberships (like Facebook groups), joins public communities by browsing them, and every
+user also has a private Personal space that is never listed. The JWT claim `tenant_id` is the
+active community; switching communities (`POST /api/users/switch`) issues a new token and the app
+bar switcher replaces the session cookie. JWT claims carry `sub`, `tenant_id`, `email`, and `name`.
+Resource queries use the token's tenant and, for personal resources, user. Other services need no
+community logic. Foreign-tenant resource IDs return 404, and email invites only resolve members
+of the current community. Private challenges also enforce invitation/participant
 visibility within a tenant. DynamoDB partition keys include `TENANT#...#USER#...` or
 `TENANT#...#CHALLENGE#...`. Tenant isolation is enforced by application code and covered by
 service tests; it is not database row-level security or a separate AWS account per tenant.
@@ -239,7 +244,7 @@ tenant context; CloudWatch aggregates metrics and sends alarms through SNS.
   are not implemented. The cohort UI flag is off by default.
 - SSE is implemented by polling DynamoDB every 3 seconds and proxying the stream through web.
   Browser polling fallback is every 10 seconds. This favors simplicity over push fan-out.
-- Tenant-name registration is open joining, mock partners have no OAuth, internal HTTP and
+- Public communities are open to join (no approval or invite codes), mock partners have no OAuth, internal HTTP and
   CloudFront-to-ALB traffic are unencrypted, and no WAF or application rate limiter is configured.
   These are case-study constraints rather than production-hardening claims.
 

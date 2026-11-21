@@ -57,22 +57,38 @@ class API {
   }
 }
 
-const TENANT_NAME = 'NAGP Demo';
-const TENANT_SLUG = 'nagp-demo';
+const DEMO_COMMUNITY = 'NAGP Demo';
 
+/** Register (or log in to) an account. Accounts are global and need no community. */
 async function account(baseUrl: string, email: string, name: string, password: string): Promise<API> {
   const api = new API(baseUrl);
   let result: Row;
   try {
-    result = await api.call('POST', '/api/users/register', {
-      email, name, password, tenant_name: TENANT_NAME, timezone: 'UTC',
-    });
+    result = await api.call('POST', '/api/users/register', { email, name, password, timezone: 'UTC' });
   } catch (error) {
     if (!(error instanceof HttpError) || error.code !== 409) throw error;
-    result = await api.call('POST', '/api/users/login', { email, password, tenant_slug: TENANT_SLUG });
+    result = await api.call('POST', '/api/users/login', { email, password });
   }
   api.token = result.token;
   return api;
+}
+
+/** Make `api` active in the named public community: create it if nobody has, else join it, else switch to it. */
+async function enter(api: API, name: string, description: string): Promise<Row> {
+  const mine: Row[] = await api.call('GET', '/api/users/communities');
+  const own = mine.find((row) => row.name === name && row.kind === 'community');
+  if (own !== undefined) {
+    const result = await api.call('POST', '/api/users/switch', { community_id: own.id });
+    api.token = result.token;
+    return result.community as Row;
+  }
+  const found: Row[] = await api.call('GET', `/api/users/communities/discover?q=${encodeURIComponent(name)}`);
+  const existing = found.find((row) => row.name === name);
+  const result = existing === undefined
+    ? await api.call('POST', '/api/users/communities', { name, description })
+    : await api.call('POST', `/api/users/communities/${existing.id}/join`);
+  api.token = result.token;
+  return result.community as Row;
 }
 
 const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
@@ -87,7 +103,13 @@ export async function seed(baseUrl: string): Promise<void> {
   const user1 = await account(baseUrl, 'testuser1@example.com', 'Test User 1', password);
   const user2 = await account(baseUrl, 'testuser2@example.com', 'Test User 2', password);
   const user3 = await account(baseUrl, 'testuser3@example.com', 'Test User 3', password);
-  console.log('1 of 6: demo tenant and four users ready');
+  // Dhruv owns NAGP Demo and everyone joins it. Two more public communities keep Discover populated.
+  await enter(user1, 'Morning Runners', 'Early starts, shared miles.');
+  await enter(user2, 'Morning Runners', 'Early starts, shared miles.');
+  await enter(user3, 'Book Club', 'One chapter a day, together.');
+  await enter(dhruv, DEMO_COMMUNITY, 'The NAGP demo community.');
+  for (const member of [user1, user2, user3]) await enter(member, DEMO_COMMUNITY, 'The NAGP demo community.');
+  console.log('1 of 6: four users and three public communities ready');
 
   // days: how many of the 30 history days this user logs.
   const plan: PlanItem[] = [

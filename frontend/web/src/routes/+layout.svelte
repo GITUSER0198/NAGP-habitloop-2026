@@ -12,7 +12,6 @@
   import { logNow } from '$lib/log.svelte';
   import Busy from '$lib/components/Busy.svelte';
   import Icon from '$lib/components/Icon.svelte';
-  import { rememberedCommunity } from '$lib/community-name';
   import { provideCommunity } from './community.svelte';
 
   let { data, children }: LayoutProps = $props();
@@ -25,14 +24,19 @@
   let mode = $state('light');
   let menuOpen = $state(false);
   let userOpen = $state(false);
-  let communityName = $state('');
+  let switcherOpen = $state(false);
   const initials = $derived((data.user?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('') || '?');
+  // After a switch the same page reloads; item pages of the old community would 404, so use their section page.
+  const reloadPath = $derived.by(() => {
+    const parts = page.url.pathname.split('/').filter(Boolean);
+    const top = parts.length > 1 && !(parts[0] === 'activities' && parts[1] === 'new') ? `/${parts[0]}` : page.url.pathname;
+    return top === '/' ? '/dashboard' : top;
+  });
   const nav = app.nav.filter(item => !item.feature || features[item.feature]);
   const snoozeKey = $derived(`habitloop:snoozes:${data.user?.tenant_id}:${data.user?.id}`);
 
   onMount(() => {
     mode = document.documentElement.dataset.mode ?? 'light';
-    communityName = rememberedCommunity();
     void import('@habitloop/components/loader').then(({ defineCustomElements }) => defineCustomElements());
     return () => model.toasts.destroy();
   });
@@ -46,9 +50,10 @@
 
   function closeMenus(event: MouseEvent): void {
     const target = event.target;
-    if (target instanceof Element && target.closest('.user-menu, #main-nav, .menu-button')) return;
+    if (target instanceof Element && target.closest('.user-menu, .community-menu, #main-nav, .menu-button')) return;
     menuOpen = false;
     userOpen = false;
+    switcherOpen = false;
   }
 
   function toggleMode(): void {
@@ -60,7 +65,7 @@
 
 <svelte:head><title>{app.name}</title><meta name="description" content={app.tagline} /></svelte:head>
 <a class="skip" href="#main">Skip to content</a>
-<svelte:window onclick={closeMenus} onkeydown={(event) => { if (event.key === 'Escape') { menuOpen = false; userOpen = false; } }} />
+<svelte:window onclick={closeMenus} onkeydown={(event) => { if (event.key === 'Escape') { menuOpen = false; userOpen = false; switcherOpen = false; } }} />
 {#if data.user}
   <header class="appbar">
     <div class="appbar-inner">
@@ -93,13 +98,34 @@
         <button class="icon-btn" onclick={toggleMode} aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
           <Icon name={mode === 'dark' ? 'sun' : 'moon'} />
         </button>
+        <div class="community-menu">
+          <button class="switcher" aria-haspopup="true" aria-expanded={switcherOpen} aria-label={`Community: ${data.community?.name ?? 'none'}. Switch community`}
+            onclick={(event) => { event.stopPropagation(); switcherOpen = !switcherOpen; userOpen = false; }}>
+            <Icon name="users" size={18} /><span class="switcher-name">{data.community?.name ?? 'Communities'}</span><Icon name="chevron" size={18} />
+          </button>
+          {#if switcherOpen}
+            <div class="menu-panel" role="group" aria-label="Your communities">
+              {#each data.communities as item (item.id)}
+                <form method="POST" action="/communities?/switch">
+                  <input type="hidden" name="community_id" value={item.id} /><input type="hidden" name="redirect_to" value={reloadPath} />
+                  <button class="menu-item" aria-current={item.active ? 'true' : undefined}>
+                    <span class="menu-check">{#if item.active}<Icon name="tick" size={18} />{/if}</span><span class="menu-label">{item.name}</span>
+                  </button>
+                </form>
+              {/each}
+              <hr />
+              <a class="menu-link" href="/communities" onclick={() => switcherOpen = false}><Icon name="users" size={18} />Browse communities</a>
+              <a class="menu-link" href="/communities#create" onclick={() => switcherOpen = false}><Icon name="plus" size={18} />Create community</a>
+            </div>
+          {/if}
+        </div>
         <div class="user-menu">
-          <button class="avatar" aria-label="Account menu" aria-haspopup="true" aria-expanded={userOpen} onclick={(event) => { event.stopPropagation(); userOpen = !userOpen; }}>{initials}</button>
+          <button class="avatar" aria-label="Account menu" aria-haspopup="true" aria-expanded={userOpen} onclick={(event) => { event.stopPropagation(); userOpen = !userOpen; switcherOpen = false; }}>{initials}</button>
           {#if userOpen}
             <div class="user-panel" role="group" aria-label="Account">
               <p class="user-name">{data.user.name}</p>
               <p class="muted">{data.user.email}</p>
-              {#if communityName}<p class="muted">Community: {communityName}</p>{/if}
+              {#if data.community}<p class="muted">Community: {data.community.name}</p>{/if}
               <form method="POST" action="/logout"><button type="submit" class="outlined"><Icon name="logout" size={18} />Log out</button></form>
             </div>
           {/if}
