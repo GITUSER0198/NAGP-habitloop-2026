@@ -1,1 +1,0 @@
-"""HabitLoop activity service."""

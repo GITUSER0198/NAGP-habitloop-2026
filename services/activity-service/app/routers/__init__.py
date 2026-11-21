@@ -1,1 +1,0 @@
-"""Activity-service HTTP routes."""

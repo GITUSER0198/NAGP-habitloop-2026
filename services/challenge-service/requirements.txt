@@ -1,2 +1,0 @@
-habitloop-shared
-email-validator>=2,<3

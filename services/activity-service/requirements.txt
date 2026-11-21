@@ -1,2 +1,0 @@
-habitloop-shared
-tzdata>=2024.2

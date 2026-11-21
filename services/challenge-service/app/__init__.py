@@ -1,1 +1,0 @@
-"""HabitLoop challenge service."""

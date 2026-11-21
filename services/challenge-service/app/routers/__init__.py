@@ -1,1 +1,0 @@
-"""Challenge service routes."""
