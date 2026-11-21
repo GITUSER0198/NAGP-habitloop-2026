@@ -3,7 +3,7 @@ import type { HTMLAttributes } from 'svelte/elements';
 declare module 'svelte/elements' {
   export interface SvelteHTMLElements {
     'hl-challenge-card': HTMLAttributes<HTMLElement> & {
-      title?: string; visibility?: string; target?: number; joined?: boolean; invited?: boolean; busy?: boolean;
+      title?: string; visibility?: string; participants?: number; progress?: number; target?: number; joined?: boolean; invited?: boolean; busy?: boolean;
       onhlJoin?: () => void; onhlAccept?: () => void; onhlDecline?: () => void;
     };
     'hl-leaderboard': HTMLAttributes<HTMLElement> & { rows?: string };

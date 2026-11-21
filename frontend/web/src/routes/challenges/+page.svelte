@@ -46,7 +46,8 @@
       <div>
         <a href={`/challenges/${challenge.id}`}>View {challenge.title}</a>
         <hl-challenge-card title={challenge.title} visibility={challenge.visibility} target={challenge.target_count} {busy}
-          joined={challenge.owner_id === data.user?.id || (form && 'joined' in form && form.joined === challenge.id) || false}
+          participants={data.stats[challenge.id]?.participants ?? 0} progress={data.stats[challenge.id]?.progress ?? 0}
+          joined={challenge.owner_id === data.user?.id || data.stats[challenge.id]?.joined || (form && 'joined' in form && form.joined === challenge.id) || false}
           onhlJoin={() => submitAction(`${challenge.id}-join`)}></hl-challenge-card>
         {#if challenge.visibility === 'public'}<ActionForms id={challenge.id} actions={[{ action: 'join', label: 'Join challenge' }]} {submit} />{/if}
       </div>

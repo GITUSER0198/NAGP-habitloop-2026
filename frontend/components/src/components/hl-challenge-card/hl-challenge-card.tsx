@@ -21,7 +21,7 @@ export class HlChallengeCard {
     return <article class="card interactive" aria-busy={String(this.busy)}>
       <div class="card-head"><span class="icon-tile" aria-hidden="true">{'\u2691'}</span>
         <h2>{this.title || 'Challenge'}</h2><span class="chip tonal">{this.visibility}</span></div>
-      <p class="muted">{nonNegative(this.participants)} participants</p>
+      <p class="muted">{nonNegative(this.participants)} {nonNegative(this.participants) === 1 ? 'participant' : 'participants'}</p>
       <p>{progress} of {target} completed</p>
       <div class="meter" role="progressbar" aria-label="Challenge progress" aria-valuemin={0} aria-valuemax={100}
         aria-valuenow={percentage(progress, target)} aria-valuetext={`${progress} of ${target}`}>
