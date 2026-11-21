@@ -1,0 +1,17 @@
+import { randomUUID } from 'node:crypto';
+import { DataType, newDb } from 'pg-mem';
+process.env.JWT_SECRET ??= 'test-jwt-secret-with-enough-entropy';
+process.env.INTERNAL_TOKEN ??= 'test-internal-token';
+process.env.DB_SCHEMA ??= 'integrations_test';
+process.env.DATABASE_URL ??= 'postgresql://test:test@localhost:5432/test';
+process.env.WEB_PORT ??= '47809';
+process.env.EVENT_BUS_MODE = 'local';
+process.env.EVENT_WORKER_URL = 'http://event-worker.test/events';
+process.env.LOG_LEVEL = 'silent';
+const memory = newDb();
+memory.public.registerFunction({ name: 'gen_random_uuid', args: [], returns: DataType.uuid, implementation: randomUUID, impure: true });
+const pool = new (memory.adapters.createPg().Pool)();
+const shared = await import('@habitloop/shared');
+shared.setPoolForTests(pool as never);
+const { drizzle } = await import('drizzle-orm/pg-proxy');
+shared.setDbForTests(drizzle(async (query, params) => { const result = await pool.query(query, params); return { rows: result.rows.map(row => Object.values(row)) }; }) as never);

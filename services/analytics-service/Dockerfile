@@ -1,14 +1,20 @@
-FROM python:3.12-slim
+FROM node:22-slim AS build
+WORKDIR /workspace
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY services/shared/node ./services/shared/node
+COPY services/analytics-service ./services/analytics-service
+RUN npm ci && npm run build -w @habitloop/shared && npm run build -w @habitloop/analytics-service && npm prune --omit=dev
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 SERVICE_PORT=47820
+FROM node:22-slim AS runtime
+ENV NODE_ENV=production SERVICE_PORT=47820
 WORKDIR /app
-COPY services/shared /opt/habitloop-shared
-RUN pip install /opt/habitloop-shared
-COPY services/analytics-service/requirements.txt ./requirements.txt
-RUN pip install -r requirements.txt && useradd --create-home --uid 10001 habitloop
-COPY --chown=habitloop:habitloop services/analytics-service/app ./app
-USER habitloop
-EXPOSE ${SERVICE_PORT}
-HEALTHCHECK --interval=10s --timeout=3s --start-period=45s --retries=5 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${SERVICE_PORT}/health', timeout=2)"
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port \"$SERVICE_PORT\" --no-access-log"]
+COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
+COPY --from=build --chown=node:node /workspace/package.json ./package.json
+COPY --from=build --chown=node:node /workspace/services/shared/node/package.json ./services/shared/node/package.json
+COPY --from=build --chown=node:node /workspace/services/shared/node/dist ./services/shared/node/dist
+COPY --from=build --chown=node:node /workspace/services/analytics-service/package.json ./services/analytics-service/package.json
+COPY --from=build --chown=node:node /workspace/services/analytics-service/dist ./services/analytics-service/dist
+USER node
+EXPOSE 47820
+HEALTHCHECK --interval=10s --timeout=3s --start-period=45s --retries=5 CMD node -e "fetch('http://127.0.0.1:'+(process.env.SERVICE_PORT||47820)+'/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+CMD ["node", "services/analytics-service/dist/index.js"]
