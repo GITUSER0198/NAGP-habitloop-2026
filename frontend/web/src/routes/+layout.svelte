@@ -21,13 +21,13 @@
     community.invites = data.pendingInvites;
     community.recommendations = data.pendingRecommendations;
   });
-  let mode = $state('dark');
+  let mode = $state('light');
   let menuOpen = $state(false);
   const nav = app.nav.filter(item => !item.feature || features[item.feature]);
   const snoozeKey = $derived(`habitloop:snoozes:${data.user?.tenant_id}:${data.user?.id}`);
 
   onMount(() => {
-    mode = document.documentElement.dataset.mode ?? 'dark';
+    mode = document.documentElement.dataset.mode ?? 'light';
     void import('@habitloop/components/loader').then(({ defineCustomElements }) => defineCustomElements());
     return () => model.toasts.destroy();
   });

@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" data-mode="dark">
+<html lang="en" data-mode="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>
       try {
-        document.documentElement.dataset.mode = localStorage.getItem('habitloop:mode') === 'light' ? 'light' : 'dark';
+        document.documentElement.dataset.mode = localStorage.getItem('habitloop:mode') === 'dark' ? 'dark' : 'light';
       } catch (_) {}
     </script>
     %sveltekit.head%
