@@ -61,3 +61,15 @@ export function yearGrid(days: HeatmapDay[]): (HeatmapDay | null)[] {
   }
   return cells;
 }
+
+export interface StackedPoint { label: string; done: number; completed: number; missed: number }
+
+/** Rows for the stacked daily bars; any invalid row rejects the whole input. */
+export function stackedPoints(value: unknown): StackedPoint[] {
+  const points: StackedPoint[] = [];
+  for (const item of parseArray(value)) {
+    if (!record(item) || typeof item.label !== 'string' || !count(item.done) || !count(item.completed) || !count(item.missed)) return [];
+    points.push({ label: item.label, done: item.done, completed: item.completed, missed: item.missed });
+  }
+  return points;
+}

@@ -1,7 +1,11 @@
 import { h } from '@stencil/core';
 
-export function Action(props: { label: string; busy?: boolean; disabled?: boolean; secondary?: boolean; onClick: () => void }) {
-  return <button type="button" class={props.secondary ? 'secondary' : ''}
+export type ActionVariant = 'filled' | 'tonal' | 'outlined' | 'text';
+
+export function Action(props: { label: string; busy?: boolean; disabled?: boolean; secondary?: boolean; variant?: ActionVariant; onClick: () => void }) {
+  const variant: ActionVariant = props.variant ?? (props.secondary ? 'tonal' : 'filled');
+  const className = variant === 'tonal' ? 'secondary' : variant === 'outlined' ? 'outlined' : variant === 'text' ? 'text' : '';
+  return <button type="button" class={className}
     disabled={props.disabled || props.busy} aria-busy={props.busy ? 'true' : 'false'}
     onClick={() => { if (!props.busy && !props.disabled) props.onClick(); }}>
     {props.busy && <span class="spinner" aria-hidden="true" />}

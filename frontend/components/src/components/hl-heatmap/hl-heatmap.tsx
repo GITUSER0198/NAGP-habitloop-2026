@@ -14,7 +14,7 @@ export class HlHeatmap {
     const days = heatmapDays(this.data), cells = yearGrid(days);
     if (!days.length) return <section class="card"><h2>Activity year</h2><p class="empty" role="status">No heatmap data</p></section>;
     const maximum = Math.max(1, ...cells.map(day => day ? day.done + day.completed : 0));
-    return <section class="card"><h2>Activity year</h2>
+    return <section class="card"><div class="card-head"><span class="icon-tile" aria-hidden="true">{'▦'}</span><h2>Activity year</h2></div>
       <p class="muted">365 days ending {days[days.length - 1].date}. Select a day for counts.</p>
       <div class="scroll"><div class="heatmap" role="group" aria-label="Activity by day, Sunday to Saturday">
         {cells.map(day => day ? <div class={`cell level-${day.done + day.completed === 0 ? 0 : Math.ceil((day.done + day.completed) / maximum * 4)}`}

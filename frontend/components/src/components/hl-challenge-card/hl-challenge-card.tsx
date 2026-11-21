@@ -18,17 +18,18 @@ export class HlChallengeCard {
 
   render() {
     const progress = nonNegative(this.progress), target = nonNegative(this.target);
-    return <article class="card" aria-busy={String(this.busy)}>
-      <div class="row"><h2>{this.title || 'Challenge'}</h2><span>{this.visibility}</span></div>
+    return <article class="card interactive" aria-busy={String(this.busy)}>
+      <div class="card-head"><span class="icon-tile" aria-hidden="true">{'\u2691'}</span>
+        <h2>{this.title || 'Challenge'}</h2><span class="chip tonal">{this.visibility}</span></div>
       <p class="muted">{nonNegative(this.participants)} participants</p>
       <p>{progress} of {target} completed</p>
       <div class="meter" role="progressbar" aria-label="Challenge progress" aria-valuemin={0} aria-valuemax={100}
         aria-valuenow={percentage(progress, target)} aria-valuetext={`${progress} of ${target}`}>
         <span style={{ width: `${percentage(progress, target)}%` }} /></div>
-      {this.joined ? <p class="accent">Joined</p> : <div class="actions">
+      {this.joined ? <p class="accent"><strong>Joined</strong></p> : <div class="actions">
         {this.invited ? [
           <Action label="Accept invitation" busy={this.busy} onClick={() => this.hlAccept.emit()} />,
-          <Action label="Decline invitation" busy={this.busy} secondary onClick={() => this.hlDecline.emit()} />,
+          <Action label="Decline invitation" busy={this.busy} variant="outlined" onClick={() => this.hlDecline.emit()} />,
         ] : this.visibility === 'public'
           ? <Action label="Join challenge" busy={this.busy} onClick={() => this.hlJoin.emit()} />
           : <p class="muted">Invitation required</p>}

@@ -17,17 +17,19 @@ export class HlRecommendationCard {
 
   render() {
     const timing = this.kind === 'timing';
-    return <article class="card" aria-busy={String(this.busy)}><h2>{timing ? 'Try a new time' : 'Adjust your frequency'}</h2>
+    return <article class="card interactive" aria-busy={String(this.busy)}>
+      <div class="card-head"><span class="icon-tile" aria-hidden="true">{'✦'}</span>
+        <h2>{timing ? 'Try a new time' : 'Adjust your frequency'}</h2>
+        <span class={this.status === 'pending' ? 'chip tonal' : 'chip'}>{this.status}</span></div>
       <p>Current: <strong>{timing ? formatTime(this.current) : this.current}</strong></p>
       <p>Suggested: <strong class="accent">{timing ? formatTime(this.suggested) : this.suggested}</strong></p>
-      <p>Status: {this.status}</p>
       <Details host={this.host} summary="Why this suggestion?">
         <p>{this.reason || 'No additional details'}</p>
         <p class="muted">Confidence: {Math.round(Math.min(1, nonNegative(this.confidence)) * 100)}%</p>
       </Details>
       {this.status === 'pending' && <div class="actions">
         <Action label="Accept suggestion" busy={this.busy} onClick={() => this.hlAccept.emit()} />
-        <Action label="Dismiss" busy={this.busy} secondary onClick={() => this.hlDismiss.emit()} />
+        <Action label="Dismiss" busy={this.busy} variant="outlined" onClick={() => this.hlDismiss.emit()} />
       </div>}
     </article>;
   }

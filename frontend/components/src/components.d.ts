@@ -5,8 +5,8 @@
  * It contains typing information for all components that exist in this project.
  */
 import { HTMLStencilElement, JSXBase } from "@stencil/core/internal";
-import { ChartPoint, HeatmapDay, JsonArray, LeaderboardRow, ReminderItem } from "./utils/data";
-export { ChartPoint, HeatmapDay, JsonArray, LeaderboardRow, ReminderItem } from "./utils/data";
+import { ChartPoint, HeatmapDay, JsonArray, LeaderboardRow, ReminderItem, StackedPoint } from "./utils/data";
+export { ChartPoint, HeatmapDay, JsonArray, LeaderboardRow, ReminderItem, StackedPoint } from "./utils/data";
 export namespace Components {
     interface HlActivitySummary {
         /**
@@ -84,11 +84,11 @@ export namespace Components {
         /**
           * @default []
          */
-        "data": JsonArray<ChartPoint | number>;
+        "data": JsonArray<ChartPoint | StackedPoint | number>;
         /**
           * @default 'trend'
          */
-        "type": 'trend' | 'bar';
+        "type": 'trend' | 'bar' | 'stacked';
     }
     interface HlHeatmap {
         /**
@@ -390,11 +390,11 @@ declare namespace LocalJSX {
         /**
           * @default []
          */
-        "data"?: JsonArray<ChartPoint | number>;
+        "data"?: JsonArray<ChartPoint | StackedPoint | number>;
         /**
           * @default 'trend'
          */
-        "type"?: 'trend' | 'bar';
+        "type"?: 'trend' | 'bar' | 'stacked';
     }
     interface HlHeatmap {
         /**
@@ -499,8 +499,8 @@ declare namespace LocalJSX {
         "busy": boolean;
     }
     interface HlChartAttributes {
-        "type": 'trend' | 'bar';
-        "data": JsonArray<ChartPoint | number>;
+        "type": 'trend' | 'bar' | 'stacked';
+        "data": JsonArray<ChartPoint | StackedPoint | number>;
     }
     interface HlHeatmapAttributes {
         "data": JsonArray<HeatmapDay>;

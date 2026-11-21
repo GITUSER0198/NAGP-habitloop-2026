@@ -1,21 +1,50 @@
 import { Component, Element, h, Prop } from '@stencil/core';
-import { chartPoints, ChartPoint, JsonArray } from '../../utils/data';
+import { chartPoints, ChartPoint, JsonArray, stackedPoints, StackedPoint } from '../../utils/data';
 import { Details } from '../../utils/ui';
 
 @Component({ tag: 'hl-chart', styleUrl: '../../styles/component.css', shadow: true })
 export class HlChart {
   @Element() host!: HTMLElement;
-  @Prop() type: 'trend' | 'bar' = 'trend';
-  @Prop() data: JsonArray<ChartPoint | number> = [];
+  @Prop() type: 'trend' | 'bar' | 'stacked' = 'trend';
+  @Prop() data: JsonArray<ChartPoint | StackedPoint | number> = [];
+
+  private renderStacked() {
+    const points = stackedPoints(this.data);
+    if (!points.length) return <section class="card"><h2>Daily activity</h2><p class="empty" role="status">No chart data</p></section>;
+    const total = (point: StackedPoint): number => point.completed + point.done + point.missed;
+    const max = points.reduce((maximum, point) => Math.max(maximum, total(point)), 1);
+    const share = (value: number): string => `${value / max * 100}%`;
+    return <section class="card"><div class="card-head"><span class="icon-tile" aria-hidden="true">{'▓'}</span><h2>Daily activity</h2></div>
+      <div class="stacked" role="img" aria-label={`Stacked bar chart of ${points.length} days: completed, done and missed`}>
+        <span class="stacked-max" aria-hidden="true">{max}</span>
+        {points.map(point => <div class="stacked-col"
+          title={`${point.label}: ${point.completed} completed, ${point.done} done, ${point.missed} missed`}>
+          <span class="seg seg-completed" style={{ height: share(point.completed) }} />
+          <span class="seg seg-done" style={{ height: share(point.done) }} />
+          <span class="seg seg-missed" style={{ height: share(point.missed) }} />
+        </div>)}
+      </div>
+      <div class="stacked-axis" aria-hidden="true"><span>{points[0].label}</span>
+        {points.length > 1 && <span>{points[points.length - 1].label}</span>}</div>
+      <div class="key" aria-hidden="true">
+        <span><i class="swatch seg-completed" />Completed</span><span><i class="swatch seg-done" />Done</span><span><i class="swatch seg-missed" />Missed</span>
+      </div>
+      <Details host={this.host} summary={`Data table (${points.length} values)`}>
+        <div class="scroll"><table><thead><tr><th scope="col">Label</th><th scope="col">Completed</th><th scope="col">Done</th><th scope="col">Missed</th></tr></thead>
+          <tbody>{points.map(point => <tr><td>{point.label}</td><td>{point.completed}</td><td>{point.done}</td><td>{point.missed}</td></tr>)}</tbody></table></div>
+      </Details>
+    </section>;
+  }
 
   render() {
+    if (this.type === 'stacked') return this.renderStacked();
     const points = chartPoints(this.data);
     if (!points.length) return <section class="card"><h2>Activity chart</h2><p class="empty" role="status">No chart data</p></section>;
     const max = points.reduce((maximum, point) => Math.max(maximum, point.value), 1);
     const x = (i: number): number => points.length === 1 ? 320 : 40 + i * 560 / (points.length - 1);
     const y = (value: number): number => 200 - value / max * 170;
     const width = 560 / points.length;
-    return <section class="card"><h2>{this.type === 'bar' ? 'Activity totals' : 'Activity trend'}</h2>
+    return <section class="card"><div class="card-head"><span class="icon-tile" aria-hidden="true">{'▓'}</span><h2>{this.type === 'bar' ? 'Activity totals' : 'Activity trend'}</h2></div>
       <svg class="chart" viewBox="0 0 640 245" role="img" aria-label={`${this.type} chart with ${points.length} values`}>
         <title>Activity {this.type}</title>
         <line class="axis" x1="40" y1="200" x2="610" y2="200" />

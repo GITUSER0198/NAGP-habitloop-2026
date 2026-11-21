@@ -20,7 +20,10 @@
   };
 </script>
 <svelte:head><title>Challenges | {app.name}</title></svelte:head>
-<h1>Challenges</h1>
+<section class="hero compact" aria-label="Challenges overview">
+  <div class="hero-main"><p class="eyebrow">Your community</p><h1>Challenges</h1>
+    <p>Join a challenge, invite teammates, and climb the leaderboard together.</p></div>
+</section>
 {#if form?.message}<p role="status" class="notice">{form.message}</p>{/if}
 {#if form && 'errors' in form}{#each Object.entries(form.errors ?? {}) as [key, message]}<p class="error">{key}: {message}</p>{/each}{/if}
 {#if busy}<Busy label="Updating challenges" />{/if}

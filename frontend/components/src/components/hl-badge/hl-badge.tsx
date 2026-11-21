@@ -9,9 +9,10 @@ export class HlBadge {
   @Prop() remaining = 0;
 
   render() {
-    return <article class={`card ${this.earned ? '' : 'locked'}`}>
-      <h2>{nonNegative(this.days)} day milestone</h2>
-      <p class={this.earned ? 'accent' : 'muted'}>{this.earned ? 'Earned' : 'Locked'}</p>
+    return <article class={`card badge-card ${this.earned ? '' : 'locked'}`}>
+      <div class="card-head"><span class="icon-tile" aria-hidden="true">{this.earned ? '★' : '☆'}</span>
+        <h2>{nonNegative(this.days)} day milestone</h2></div>
+      <p class={this.earned ? 'accent' : 'muted'}><strong>{this.earned ? 'Earned' : 'Locked'}</strong></p>
       {this.earned ? <p>Earned: {formatDateTime(this.earnedAt)}</p> : <p>{nonNegative(this.remaining)} days remaining</p>}
     </article>;
   }

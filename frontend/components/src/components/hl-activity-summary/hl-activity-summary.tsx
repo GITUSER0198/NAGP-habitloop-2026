@@ -16,15 +16,20 @@ export class HlActivitySummary {
   render() {
     const knownCategory = Object.hasOwn(categories, this.category);
     const icon = knownCategory ? categories[this.category as keyof typeof categories] : categories.other;
-    return <article class="card" aria-busy={String(this.busy)}>
-      <div class="row"><h2><i class={`ti ${icon}`} aria-hidden="true" /> {this.name || 'Untitled activity'}</h2>
-        <span>{knownCategory ? this.category : 'other'}</span></div>
-      <p class="muted">{formatTime(this.preferredTime)}</p>
-      <p>Status: <strong>{this.status}</strong></p>
-      <p class="accent">{nonNegative(this.streak)} day streak</p>
+    const logged = this.status !== 'Not logged';
+    return <article class="card interactive" aria-busy={String(this.busy)}>
+      <div class="card-head"><span class="icon-tile"><i class={`ti ${icon}`} aria-hidden="true" /></span>
+        <h2>{this.name || 'Untitled activity'}</h2>
+        <span class="chip tonal">{knownCategory ? this.category : 'other'}</span></div>
+      <div class="chips">
+        <span class="chip">{formatTime(this.preferredTime)}</span>
+        <span class={logged ? 'chip tonal' : 'chip'}>Status: <strong>{this.status}</strong></span>
+        <span class="chip">{nonNegative(this.streak)} day streak</span>
+      </div>
       <div class="actions">{['done', 'completed', 'missed'].map(status =>
         <Action label={status === 'done' ? 'Log done' : status === 'completed' ? 'Log completed' : 'Log missed'}
-          busy={this.busy} secondary={status !== 'completed'} onClick={() => this.hlLog.emit({ status })} />)}</div>
+          busy={this.busy} variant={status === 'completed' ? 'filled' : status === 'done' ? 'tonal' : 'outlined'}
+          onClick={() => this.hlLog.emit({ status })} />)}</div>
     </article>;
   }
 }

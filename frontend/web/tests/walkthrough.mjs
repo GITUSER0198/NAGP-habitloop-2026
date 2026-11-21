@@ -40,12 +40,12 @@ async function api(path, body, token) {
 }
 
 try {
-  console.log('1 of 8: register, tenant check and cookie');
+  console.log('1 of 8: register, community check and cookie');
   await page.goto(`${web}/onboarding`);
   await page.waitForFunction(() => !!customElements.get('hl-chart'));
-  await page.getByLabel('Tenant name', { exact: true }).fill(tenant);
-  await page.getByRole('button', { name: 'Check tenant', exact: true }).click();
-  await page.getByText('A new tenant will be created when you register.').waitFor();
+  await page.getByLabel('Community', { exact: true }).fill(tenant);
+  await page.getByRole('button', { name: 'Check community', exact: true }).click();
+  await page.getByText('A new community will be created when you register.').waitFor();
   await page.getByLabel('Your name', { exact: true }).fill('Web acceptance');
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
@@ -113,13 +113,13 @@ try {
     return snapshot.today.done + snapshot.today.completed === 2;
   }, 'wearable analytics');
   await until(async () => Number(await page.getByTestId('summary-done').textContent())
-    + Number(await page.locator('dd').nth(1).textContent()) === 2, 'wearable UI summary');
+    + Number(await page.getByTestId('summary-completed').textContent()) === 2, 'wearable UI summary');
   assert.equal(await page.evaluate(() => window.habitloopAcceptance), 'same document');
   await page.locator('hl-activity-summary').getByRole('button', { name: 'Log completed', exact: true }).click();
   await until(async () => Number(await page.getByTestId('summary-done').textContent())
-    + Number(await page.locator('dd').nth(1).textContent()) === 3, 'completed status summary');
+    + Number(await page.getByTestId('summary-completed').textContent()) === 3, 'completed status summary');
   await page.locator('hl-activity-summary').getByRole('button', { name: 'Log missed', exact: true }).click();
-  await until(async () => await page.locator('dd').nth(2).textContent() === '1', 'missed status summary');
+  await until(async () => await page.getByTestId('summary-missed').textContent() === '1', 'missed status summary');
   await until(async () => await page.locator('hl-heatmap').evaluate(element => {
     const data = typeof element.data === 'string' ? JSON.parse(element.data) : element.data;
     return data.some(day => day.done + day.completed === 3 && day.missed === 1);
@@ -148,11 +148,11 @@ try {
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   assert.ok(await page.getByRole('navigation', { name: 'Main navigation' }).isVisible());
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.locator('.user-menu > summary').click();
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click();
   await page.getByRole('button', { name: 'Log out', exact: true }).click();
   await page.waitForURL('**/onboarding');
   await page.getByRole('button', { name: 'Log in', exact: true }).first().click();
-  await page.getByLabel('Tenant name or slug', { exact: true }).fill(tenant);
+  await page.getByLabel('Community', { exact: true }).fill(tenant);
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).last().click();

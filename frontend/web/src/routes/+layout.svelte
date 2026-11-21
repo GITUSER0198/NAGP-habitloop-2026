@@ -10,8 +10,9 @@
   import { provideState } from '$lib/state/app.svelte';
   import { startLive } from '$lib/live.svelte';
   import { logNow } from '$lib/log.svelte';
-  import { rememberOpen } from '$lib/disclosure';
   import Busy from '$lib/components/Busy.svelte';
+  import Icon from '$lib/components/Icon.svelte';
+  import { rememberedCommunity } from '$lib/community-name';
   import { provideCommunity } from './community.svelte';
 
   let { data, children }: LayoutProps = $props();
@@ -23,11 +24,15 @@
   });
   let mode = $state('light');
   let menuOpen = $state(false);
+  let userOpen = $state(false);
+  let communityName = $state('');
+  const initials = $derived((data.user?.name ?? '').split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('') || '?');
   const nav = app.nav.filter(item => !item.feature || features[item.feature]);
   const snoozeKey = $derived(`habitloop:snoozes:${data.user?.tenant_id}:${data.user?.id}`);
 
   onMount(() => {
     mode = document.documentElement.dataset.mode ?? 'light';
+    communityName = rememberedCommunity();
     void import('@habitloop/components/loader').then(({ defineCustomElements }) => defineCustomElements());
     return () => model.toasts.destroy();
   });
@@ -39,6 +44,13 @@
     return startLive(model, data.expiresAt);
   });
 
+  function closeMenus(event: MouseEvent): void {
+    const target = event.target;
+    if (target instanceof Element && target.closest('.user-menu, #main-nav, .menu-button')) return;
+    menuOpen = false;
+    userOpen = false;
+  }
+
   function toggleMode(): void {
     mode = mode === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.mode = mode;
@@ -48,37 +60,59 @@
 
 <svelte:head><title>{app.name}</title><meta name="description" content={app.tagline} /></svelte:head>
 <a class="skip" href="#main">Skip to content</a>
-<header>
-  <a class="brand" href={data.user ? '/dashboard' : '/onboarding'}>{app.name}</a>
-  {#if data.user}
-    <button class="menu-button secondary" aria-expanded={menuOpen} aria-controls="main-nav" onclick={() => menuOpen = !menuOpen}>Menu</button>
-    <nav id="main-nav" class:menu-open={menuOpen} aria-label="Main navigation">
-      {#each nav as item}
-        <a href={item.href} aria-current={page.url.pathname === item.href ? 'page' : undefined} onclick={() => menuOpen = false}>
-          {item.label}
-          {#if item.feature === 'challenges' && community.invites}
-            <span class="nav-badge" aria-label={`${community.invites} pending invites`}>{community.invites}</span>
-          {:else if item.feature === 'recommendations' && community.recommendations}
-            <span class="nav-badge" aria-label={`${community.recommendations} pending recommendations`}>{community.recommendations}</span>
+<svelte:window onclick={closeMenus} onkeydown={(event) => { if (event.key === 'Escape') { menuOpen = false; userOpen = false; } }} />
+{#if data.user}
+  <header class="appbar">
+    <div class="appbar-inner">
+      <button class="icon-btn menu-button" aria-expanded={menuOpen} aria-controls="main-nav" onclick={(event) => { event.stopPropagation(); menuOpen = !menuOpen; }}>
+        <Icon name="menu" /><span class="sr-only">Menu</span>
+      </button>
+      <a class="brand" href="/dashboard"><span class="logo-mark"><Icon name="loop" size={22} /></span><span class="wordmark">{app.name}</span></a>
+      <nav id="main-nav" class:menu-open={menuOpen} aria-label="Main navigation">
+        {#each nav as item}
+          {@const exact = page.url.pathname === item.href}
+          {@const section = !exact && item.href !== '/activities/new' && page.url.pathname.startsWith(`${item.href}/`)}
+          <a class="nav-link" href={item.href} title={item.label} aria-current={exact ? 'page' : section ? 'true' : undefined} onclick={() => menuOpen = false}>
+            <Icon name={item.icon} />
+            <span class="nav-label">{item.label}</span>
+            {#if item.feature === 'challenges' && community.invites}
+              <span class="nav-badge" aria-label={`${community.invites} pending invites`}>{community.invites}</span>
+            {:else if item.feature === 'recommendations' && community.recommendations}
+              <span class="nav-badge" aria-label={`${community.recommendations} pending recommendations`}>{community.recommendations}</span>
+            {/if}
+          </a>
+        {/each}
+      </nav>
+      <div class="appbar-actions">
+        {#if features.reminders}
+          <a class="icon-btn bell" href={model.today.reminders.length ? '#reminders' : '/dashboard'} aria-label={`${model.today.reminders.length} reminders`}>
+            <Icon name="bell" />
+            {#if model.today.reminders.length}<span class="count-badge" aria-hidden="true">{model.today.reminders.length}</span>{/if}
+          </a>
+        {/if}
+        <button class="icon-btn" onclick={toggleMode} aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
+          <Icon name={mode === 'dark' ? 'sun' : 'moon'} />
+        </button>
+        <div class="user-menu">
+          <button class="avatar" aria-label="Account menu" aria-haspopup="true" aria-expanded={userOpen} onclick={(event) => { event.stopPropagation(); userOpen = !userOpen; }}>{initials}</button>
+          {#if userOpen}
+            <div class="user-panel" role="group" aria-label="Account">
+              <p class="user-name">{data.user.name}</p>
+              <p class="muted">{data.user.email}</p>
+              {#if communityName}<p class="muted">Community: {communityName}</p>{/if}
+              <form method="POST" action="/logout"><button type="submit" class="outlined"><Icon name="logout" size={18} />Log out</button></form>
+            </div>
           {/if}
-        </a>
-      {/each}
-    </nav>
-    {#if features.reminders}
-      <a class="bell" href={model.today.reminders.length ? '#reminders' : '/dashboard'} aria-label={`${model.today.reminders.length} reminders`}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
-        <span>Reminders ({model.today.reminders.length})</span>
-      </a>
-    {/if}
-  {/if}
-  <button class="secondary" onclick={toggleMode} aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>{mode === 'dark' ? 'Light mode' : 'Dark mode'}</button>
-  {#if data.user}
-    <details class="user-menu" use:rememberOpen={'user-menu'}><summary>{data.user.name}</summary>
-      <div><p>{data.user.email}</p><p>User ID: <code>{data.user.id}</code></p><form method="POST" action="/logout"><button type="submit" class="secondary">Log out</button></form></div>
-    </details>
-  {/if}
-</header>
-<main id="main">
+        </div>
+      </div>
+    </div>
+  </header>
+{:else}
+  <button class="icon-btn floating-toggle" onclick={toggleMode} aria-label={`Switch to ${mode === 'dark' ? 'light' : 'dark'} mode`}>
+    <Icon name={mode === 'dark' ? 'sun' : 'moon'} />
+  </button>
+{/if}
+<main id="main" class:bare={!data.user}>
   {#if data.user && features.reminders && model.today.reminders.length}
     <section id="reminders" aria-label="Due soon">
       <hl-reminder-banner id="today-reminders" items={JSON.stringify(model.today.reminders)} busy={model.today.reminderBusy}
@@ -97,6 +131,3 @@
     <div class:toast-error={toast.error} class="toast">{toast.message}<button class="secondary" aria-label="Dismiss notification" onclick={() => model.toasts.dismiss(toast.id)}>Close</button></div>
   {/each}
 </aside>
-<style>
-  .nav-badge { display: inline-block; padding: 0 0.4rem; border-radius: var(--hl-radius); background: var(--hl-accent); color: var(--hl-accent-contrast); font-size: 0.8rem; }
-</style>

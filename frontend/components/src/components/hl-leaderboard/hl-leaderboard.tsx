@@ -16,7 +16,7 @@ export class HlLeaderboard {
         <td>{offset + index + 1}</td><td>{String(row.name)}{row.isMe === true ? ' (you)' : ''}</td>
         <td>{nonNegative(row.count)}</td><td>{nonNegative(row.target)}</td></tr>)}</tbody>
     </table></div>;
-    return <section class="card"><h2>Leaderboard</h2>
+    return <section class="card"><div class="card-head"><span class="icon-tile" aria-hidden="true">{'♔'}</span><h2>Leaderboard</h2></div>
       {!rows.length ? <p class="empty" role="status">No participants yet</p> : table(rows.slice(0, 5))}
       {rows.length > 5 && <Details host={this.host} summary={`More participants (${rows.length - 5})`}>{table(rows.slice(5), 5)}</Details>}
     </section>;

@@ -8,6 +8,11 @@ function slug(value: string): string {
   return value.normalize('NFKD').replace(/[^\x00-\x7F]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+/** The API speaks of tenants; the UI says community. */
+function communityText(message: string): string {
+  return message.replace(/tenant name|tenant slug|tenant|slug/gi, 'community');
+}
+
 export const load: PageServerLoad = ({ locals, url }) => {
   if (locals.user) redirect(303, '/dashboard');
   return { expired: url.searchParams.get('message') === 'expired' };
@@ -21,14 +26,14 @@ async function authenticate(event: Parameters<Actions[string]>[0], mode: 'regist
   };
   const password = String(data.get('password') ?? '');
   const errors: Record<string, string> = {};
-  if (!slug(values.tenant)) errors.tenant = 'Enter a tenant name using letters or numbers.';
+  if (!slug(values.tenant)) errors.tenant = 'Enter a community name using letters or numbers.';
   if (!values.email) errors.email = 'Enter your email.';
   if (!password) errors.password = 'Enter your password.';
   if (mode === 'register' && !values.name) errors.name = 'Enter your name.';
   if (Object.keys(errors).length) return fail(400, { mode, values, errors });
   try {
     const tenant = await api<{ exists: boolean; name: string | null }>(event, `/api/users/tenants/${encodeURIComponent(slug(values.tenant))}`, {}, false);
-    if (mode === 'login' && !tenant.exists) return fail(400, { mode, values, errors: { tenant: 'This tenant does not exist. Register to create it.' } });
+    if (mode === 'login' && !tenant.exists) return fail(400, { mode, values, errors: { tenant: 'This community does not exist. Register to create it.' } });
     const body = mode === 'register'
       ? { ...values, tenant: undefined, tenant_name: values.tenant, password }
       : { tenant_slug: slug(values.tenant), email: values.email, password };
@@ -41,8 +46,8 @@ async function authenticate(event: Parameters<Actions[string]>[0], mode: 'regist
   } catch (cause) {
     if (!(cause instanceof ApiError)) throw cause;
     const errors = { ...cause.fields };
-    if (errors.tenant_name || errors.tenant_slug) errors.tenant = errors.tenant_name ?? errors.tenant_slug;
-    if (!Object.keys(errors).length) errors[mode === 'login' && cause.status === 401 ? 'password' : '_form'] = cause.message;
+    if (errors.tenant_name || errors.tenant_slug) errors.tenant = communityText(errors.tenant_name ?? errors.tenant_slug);
+    if (!Object.keys(errors).length) errors[mode === 'login' && cause.status === 401 ? 'password' : '_form'] = communityText(cause.message);
     return fail(cause.status, { mode, values, errors });
   }
   redirect(303, '/dashboard');
@@ -51,17 +56,17 @@ async function authenticate(event: Parameters<Actions[string]>[0], mode: 'regist
 export const actions: Actions = {
   register: (event) => authenticate(event, 'register'),
   login: (event) => authenticate(event, 'login'),
-  tenant: async (event) => {
+  community: async (event) => {
     const data = await event.request.formData();
     const values = { tenant: String(data.get('tenant') ?? '').trim(), email: String(data.get('email') ?? ''), name: String(data.get('name') ?? ''), timezone: String(data.get('timezone') ?? 'UTC') };
     const mode = data.get('mode') === 'login' ? 'login' : 'register';
-    if (!slug(values.tenant)) return fail(400, { mode, values, errors: { tenant: 'Enter a tenant name using letters or numbers.' } });
+    if (!slug(values.tenant)) return fail(400, { mode, values, errors: { tenant: 'Enter a community name using letters or numbers.' } });
     try {
       const tenant = await api<{ exists: boolean; name: string | null }>(event, `/api/users/tenants/${encodeURIComponent(slug(values.tenant))}`, {}, false);
-      return { mode, values, errors: {}, tenantMessage: tenant.exists ? `You will join ${tenant.name}.` : 'A new tenant will be created when you register.' };
+      return { mode, values, errors: {}, tenantMessage: tenant.exists ? `You will join ${tenant.name}.` : 'A new community will be created when you register.' };
     } catch (cause) {
       if (!(cause instanceof ApiError)) throw cause;
-      return fail(cause.status, { mode, values, errors: { tenant: cause.message } });
+      return fail(cause.status, { mode, values, errors: { tenant: communityText(cause.message) } });
     }
   }
 };

@@ -21,7 +21,7 @@
     <p>{data.challenge.start_date} to {data.challenge.end_date}</p><p>Target: {data.challenge.target_count} activities</p>
     {#if data.challenge.owner_id === data.user?.id}
       <h2>Invite a participant</h2>
-      <p class="muted">Send one invitation at a time using a participant's email in your tenant. Leave blank to show the code.</p>
+      <p class="muted">Send one invitation at a time using a participant's email in your community. Leave blank to show the code.</p>
       <form method="POST" action="?/invite" use:enhance={() => {
         busy = true; return async ({ update }) => { try { await update({ reset: false }); } finally { busy = false; } };
       }}>

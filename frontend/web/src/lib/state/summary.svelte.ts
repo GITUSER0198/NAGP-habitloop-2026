@@ -8,5 +8,6 @@ export class SummaryState {
   cohorts = $state<Cohort[] | null>(null);
   successes = $derived(this.value ? this.value.today.done + this.value.today.completed : 0);
   rate = $derived(this.value ? Math.round(this.value.rate_7d * 100) : 0);
+  stacked = $derived(this.trend?.map(day => ({ label: day.date, done: day.done, completed: day.completed, missed: day.missed })) ?? []);
   chart = $derived(this.trend?.map(day => ({ label: day.date, value: day.done + day.completed })) ?? []);
 }

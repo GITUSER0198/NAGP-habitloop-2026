@@ -14,13 +14,13 @@ export class HlReminderBanner {
   render() {
     const items = parseArray(this.items).filter(record).filter(item => typeof item.activityId === 'string'
       && typeof item.name === 'string' && typeof item.dueAt === 'string') as unknown as ReminderItem[];
-    const list = (visible: ReminderItem[]) => <ul>{visible.map(item => <li>
-      <strong>{item.name}</strong><p class="muted">Due: {formatDateTime(item.dueAt)}</p>
+    const list = (visible: ReminderItem[]) => <ul class="plain">{visible.map(item => <li class="reminder-item">
+      <div><strong>{item.name}</strong><p class="muted">Due: {formatDateTime(item.dueAt)}</p></div>
       <div class="actions"><Action label="Log now" busy={this.busy} onClick={() => this.hlLogNow.emit({ activityId: item.activityId })} />
-        <Action label="Snooze" busy={this.busy} secondary onClick={() => this.hlSnooze.emit({ activityId: item.activityId })} /></div>
+        <Action label="Snooze" busy={this.busy} variant="outlined" onClick={() => this.hlSnooze.emit({ activityId: item.activityId })} /></div>
     </li>)}</ul>;
     return <section class="card" aria-busy={String(this.busy)} aria-label="Activity reminders">
-      <h2>Reminders ({items.length})</h2>
+      <div class="card-head"><span class="icon-tile" aria-hidden="true">{'◷'}</span><h2>Reminders ({items.length})</h2></div>
       {!items.length ? <p class="empty" role="status">You're all caught up</p> : list(items.slice(0, 3))}
       {items.length > 3 && <Details host={this.host} summary={`More reminders (${items.length - 3})`}>{list(items.slice(3))}</Details>}
     </section>;
