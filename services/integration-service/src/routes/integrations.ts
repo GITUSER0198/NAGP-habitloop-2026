@@ -6,9 +6,24 @@ import { getDb, invalidInput, publish, requireInternal, requireUser, type UserCl
 import { links, partnerEvents } from '../db/schema.js';
 
 const Uuid = Type.String({ format: 'uuid' });
-const providers = [{ provider: 'mockfit', activity_types: ['run', 'walk', 'cycle', 'swim'] }, { provider: 'mockrun', activity_types: ['run', 'walk'] }];
-type IngestBody = { event_id: string; type: 'workout'; started_at: string; duration_min: number; steps?: number | null; provider_activity: string };
-const LinkBody = Type.Object({ provider: Type.Union([Type.Literal('mockfit'), Type.Literal('mockrun')]), activity_map: Type.Record(Type.String(), Uuid) }, { additionalProperties: false });
+const providers = [
+  { provider: 'mockfit', activity_types: ['run', 'walk', 'cycle', 'swim'] },
+  { provider: 'mockrun', activity_types: ['run', 'walk'] },
+  { provider: 'galaxywatch', activity_types: ['walk', 'run', 'cycle', 'steps'] }
+];
+type IngestBody = {
+  event_id: string;
+  type: 'workout' | 'steps';
+  started_at: string;
+  duration_min?: number | null;
+  steps?: number | null;
+  provider_activity: string;
+  avg_heart_rate?: number | null;
+};
+const LinkBody = Type.Object({
+  provider: Type.Union([Type.Literal('mockfit'), Type.Literal('mockrun'), Type.Literal('galaxywatch')]),
+  activity_map: Type.Record(Type.String(), Uuid)
+}, { additionalProperties: false });
 function id(request: FastifyRequest): UserClaims { return request.user!; }
 function fail(statusCode: number, message: string): never { throw Object.assign(new Error(message), { statusCode }); }
 function validMap(provider: string, map: Record<string, string>): boolean {
@@ -35,13 +50,21 @@ function normalizedStartedAt(value: unknown): string | undefined {
 function payloadValid(value: unknown): value is IngestBody {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const item = value as Record<string, unknown>;
-  const allowed = new Set(['event_id', 'type', 'started_at', 'duration_min', 'steps', 'provider_activity']);
+  const allowed = new Set(['event_id', 'type', 'started_at', 'duration_min', 'steps', 'provider_activity', 'avg_heart_rate']);
   if (Object.keys(item).some(key => !allowed.has(key))) return false;
-  if (typeof item.event_id !== 'string' || !item.event_id.length || item.event_id.length > 255 || item.type !== 'workout' ||
+  if (typeof item.event_id !== 'string' || !item.event_id.length || item.event_id.length > 255 ||
+      (item.type !== 'workout' && item.type !== 'steps') ||
       typeof item.provider_activity !== 'string' || !item.provider_activity.length || item.provider_activity.length > 255 ||
-      normalizedStartedAt(item.started_at) === undefined ||
-      !Number.isInteger(item.duration_min) || (item.duration_min as number) < 0) return false;
-  return item.steps === undefined || item.steps === null || (Number.isInteger(item.steps) && (item.steps as number) >= 0);
+      normalizedStartedAt(item.started_at) === undefined) return false;
+  if (item.type === 'workout') {
+    if (!Number.isInteger(item.duration_min) || (item.duration_min as number) < 0) return false;
+  } else if (item.duration_min !== undefined && item.duration_min !== null) {
+    if (!Number.isInteger(item.duration_min) || (item.duration_min as number) < 0) return false;
+  }
+  if (item.steps !== undefined && item.steps !== null && (!Number.isInteger(item.steps) || (item.steps as number) < 0)) return false;
+  if (item.avg_heart_rate !== undefined && item.avg_heart_rate !== null &&
+      (typeof item.avg_heart_rate !== 'number' || !Number.isFinite(item.avg_heart_rate) || item.avg_heart_rate <= 0)) return false;
+  return true;
 }
 function safeEqualHex(actual: string, expected: string): boolean {
   if (!/^sha256=[0-9a-f]{64}$/.test(actual)) return false;
@@ -98,7 +121,11 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
     try { request.body = JSON.parse(bodyText.toString('utf8')); }
     catch { invalidInput('JSON decode error', null); }
     if (!payloadValid(request.body)) invalidInput('Invalid partner event', request.body);
-    const body = request.body; const eventPayload: Record<string, unknown> = { ...body, started_at: normalizedStartedAt(body.started_at) }; if (body.steps === null) delete eventPayload.steps;
+    const body = request.body;
+    const eventPayload: Record<string, unknown> = { ...body, started_at: normalizedStartedAt(body.started_at) };
+    if (body.steps === null) delete eventPayload.steps;
+    if (body.avg_heart_rate === null) delete eventPayload.avg_heart_rate;
+    if (body.duration_min === null) delete eventPayload.duration_min;
     let inserted: typeof partnerEvents.$inferSelect;
     try {
       inserted = (await getDb().insert(partnerEvents).values({ id: randomUUID(), tenant_id: link.tenant_id, link_id: link.id,

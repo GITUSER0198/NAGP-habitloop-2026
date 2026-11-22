@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug only: lets adb inject a signed test event through the real ingest path. -->
+        <receiver
+            android:name=".DebugEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.dhruvgoel.habitloop.TEST_EVENT" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

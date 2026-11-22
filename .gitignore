@@ -12,3 +12,8 @@ data/
 
 # Generated Lambda packages (infra/scripts/package-lambdas.ts)
 /*.zip
+
+# Mobile local configuration and build artifacts
+mobile/local.properties
+mobile/.gradle/
+mobile/**/build/

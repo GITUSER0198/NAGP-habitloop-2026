@@ -93,6 +93,20 @@ describe('normalizer parity', () => {
     expect(JSON.parse(String(calls.at(-1)?.init?.body))).toEqual({ status: 'normalized' });
   });
 
+  it('normalizes galaxywatch steps and workout events with avg_heart_rate metadata', async () => {
+    linkRows = [{ id: ids.link, tenant_id: ids.tenant, user_id: ids.user, provider: 'galaxywatch', status: 'active', activity_map: { steps: ids.activity, walk: ids.activity } }];
+    const stepsEv = { tenant_id: ids.tenant, user_id: ids.user, link_id: ids.link, partner_event_id: ids.partner,
+      provider: 'galaxywatch', raw: { type: 'steps', event_id: 'steps-evt-1', provider_activity: 'steps', steps: 6000, avg_heart_rate: 112, started_at: '2026-11-19T09:00:00Z' } };
+    await handler(stepsEv);
+    const post = calls.find(call => call.url.endsWith('/api/activities/internal/logs'))!;
+    const body = JSON.parse(String(post.init?.body));
+    expect(body).toMatchObject({
+      tenant_id: ids.tenant, user_id: ids.user, activity_id: ids.activity, status: 'completed',
+      source: 'partner', duration_min: null,
+      metadata: { provider: 'galaxywatch', link_id: ids.link, event_id: 'steps-evt-1', steps: 6000, avg_heart_rate: 112 }
+    });
+  });
+
   it('rejects unmapped partner activity with a reason', async () => {
     const event = detail(); event.raw.provider_activity = 'swim'; await handler(event);
     expect(calls.some(call => call.url.endsWith('/api/activities/internal/logs'))).toBe(false);

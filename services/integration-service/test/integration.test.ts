@@ -33,7 +33,7 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     return app.inject({ method: 'POST', url: `/api/integrations/ingest/${link.id}`, headers: { 'content-type': 'application/json', 'x-habitloop-signature': signature }, payload: raw });
   }
   it('lists providers, discloses the key once, hashes it, and soft deletes tenant links', async () => {
-    expect((await app.inject({ method: 'GET', url: '/api/integrations/providers', headers: auth() })).json().map((item: { provider: string }) => item.provider)).toEqual(['mockfit', 'mockrun']);
+    expect((await app.inject({ method: 'GET', url: '/api/integrations/providers', headers: auth() })).json().map((item: { provider: string }) => item.provider)).toEqual(['mockfit', 'mockrun', 'galaxywatch']);
     const created = await create(); expect(created.statusCode).toBe(201); const link = created.json();
     expect(link.tenant_id).toBe(tenant); expect(link.user_id).toBe(user); expect(link.ingest_key).toBeTruthy();
     const stored = (await getPool().query('SELECT ingest_key_hash FROM "integrations_test".links WHERE id=$1', [link.id])).rows[0];
@@ -54,6 +54,12 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     expect((await getPool().query('SELECT id FROM "integrations_test".partner_events')).rows).toHaveLength(1);
     const second = (await create('mockrun')).json(); expect((await send(second)).statusCode).toBe(202);
     expect(eventFetch.mock.calls.filter(call => String(call[0]).endsWith('/events'))).toHaveLength(2);
+    const watchLink = (await create('galaxywatch', { walk: activity, run: activity, cycle: activity, steps: activity })).json();
+    expect(watchLink.provider).toBe('galaxywatch');
+    const stepsPayload = { event_id: 'steps-1', type: 'steps', provider_activity: 'steps', started_at: '2026-11-19T09:00:00Z', steps: 6000, avg_heart_rate: 110 };
+    const stepsRes = await send(watchLink, stepsPayload);
+    expect(stepsRes.statusCode).toBe(202);
+    expect(eventFetch.mock.calls.filter(call => String(call[0]).endsWith('/events'))).toHaveLength(3);
   });
   it.each([undefined, 'sha256=bad', `sha256=${'0'.repeat(64)}`, 'sha256=é'])('rejects bad signature %s without storing or publishing', async signature => {
     const link = (await create()).json(); const headers: Record<string, string> = { 'content-type': 'application/json' }; if (signature !== undefined) headers['x-habitloop-signature'] = signature;
@@ -133,7 +139,8 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     expect(providers.statusCode).toBe(200);
     expect(providers.json()).toEqual([
       { provider: 'mockfit', activity_types: ['run', 'walk', 'cycle', 'swim'] },
-      { provider: 'mockrun', activity_types: ['run', 'walk'] }
+      { provider: 'mockrun', activity_types: ['run', 'walk'] },
+      { provider: 'galaxywatch', activity_types: ['walk', 'run', 'cycle', 'steps'] }
     ]);
     const created = await create(); expect(created.statusCode).toBe(201);
     const link = created.json();

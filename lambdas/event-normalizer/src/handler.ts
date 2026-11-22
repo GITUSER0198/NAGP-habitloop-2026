@@ -40,13 +40,21 @@ async function mark(detail: Detail, headers: Record<string, string>, status: str
 function workout(raw: unknown): JsonObject {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Workout must be an object');
   const value = raw as JsonObject;
-  if (value.type !== 'workout') throw new Error('Unsupported partner event type');
+  if (value.type !== 'workout' && value.type !== 'steps') throw new Error('Unsupported partner event type');
   for (const key of ['event_id', 'provider_activity']) {
     const field = value[key];
     if (typeof field !== 'string' || !field.trim() || Array.from(field).length > 255) throw new Error(`Invalid ${key}`);
   }
-  if (!Number.isInteger(value.duration_min) || (value.duration_min as number) < 0) throw new Error('duration_min must be a nonnegative integer');
+  if (value.type === 'workout') {
+    if (!Number.isInteger(value.duration_min) || (value.duration_min as number) < 0) throw new Error('duration_min must be a nonnegative integer');
+  } else if (value.duration_min !== undefined && value.duration_min !== null) {
+    if (!Number.isInteger(value.duration_min) || (value.duration_min as number) < 0) throw new Error('duration_min must be a nonnegative integer');
+  }
   if (value.steps !== undefined && value.steps !== null && (!Number.isInteger(value.steps) || (value.steps as number) < 0)) throw new Error('steps must be a nonnegative integer');
+  if (value.avg_heart_rate !== undefined && value.avg_heart_rate !== null &&
+      (typeof value.avg_heart_rate !== 'number' || !Number.isFinite(value.avg_heart_rate) || (value.avg_heart_rate as number) <= 0)) {
+    throw new Error('avg_heart_rate must be a positive number');
+  }
   eventTimestamp(value.started_at, 'started_at must be an ISO timestamp with timezone', 'started_at must include a timezone');
   return value;
 }
@@ -65,7 +73,7 @@ export async function normalize(untrusted: unknown): Promise<void> {
   const headers = await serviceHeaders(detail);
   let raw: JsonObject;
   try {
-    if (detail.provider !== 'mockfit' && detail.provider !== 'mockrun') throw new Error('Unsupported provider');
+    if (detail.provider !== 'mockfit' && detail.provider !== 'mockrun' && detail.provider !== 'galaxywatch') throw new Error('Unsupported provider');
     raw = workout(detail.raw);
   } catch (error) {
     await mark(detail, headers, 'rejected', error instanceof Error ? error.message : 'Invalid workout');
@@ -90,15 +98,26 @@ export async function normalize(untrusted: unknown): Promise<void> {
   if (activity === undefined || activity === null) { await mark(detail, headers, 'rejected', `Unmapped provider activity: ${raw.provider_activity}`); return; }
   try { activity = eventUuid(activity, 'activity_id'); }
   catch { await mark(detail, headers, 'rejected', 'Mapped activity ID is invalid'); return; }
-  const status = (raw.duration_min as number) >= 20 || ((raw.steps as number | null | undefined) ?? 0) >= 5000 ? 'completed' : 'done';
+  const status = raw.type === 'steps'
+    ? (((raw.steps as number | null | undefined) ?? 0) >= 5000 ? 'completed' : 'done')
+    : ((raw.duration_min as number) >= 20 || ((raw.steps as number | null | undefined) ?? 0) >= 5000 ? 'completed' : 'done');
+  const metadata: JsonObject = {
+    provider: detail.provider,
+    link_id: detail.link_id,
+    event_id: raw.event_id,
+    steps: raw.steps ?? null
+  };
+  if (raw.avg_heart_rate !== undefined && raw.avg_heart_rate !== null) {
+    metadata.avg_heart_rate = raw.avg_heart_rate;
+  }
   const activityBase = env('ACTIVITY_SERVICE_URL').replace(/\/+$/, '');
   const response = await request(`${activityBase}/api/activities/internal/logs`, {
     method: 'POST', headers,
     body: JSON.stringify({
       tenant_id: detail.tenant_id, user_id: detail.user_id, activity_id: activity, status,
-      logged_at: raw.started_at, duration_min: raw.duration_min, source: 'partner',
+      logged_at: raw.started_at, duration_min: raw.duration_min ?? null, source: 'partner',
       source_event_id: detail.partner_event_id,
-      metadata: { provider: detail.provider, link_id: detail.link_id, event_id: raw.event_id, steps: raw.steps ?? null }
+      metadata
     })
   });
   if ([404, 409, 422].includes(response.status)) { await mark(detail, headers, 'rejected', `Activity log rejected (HTTP ${response.status})`); return; }
