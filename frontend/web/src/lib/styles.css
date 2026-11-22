@@ -34,7 +34,7 @@ nav { display: flex; flex: 1; align-items: center; gap: 0.25rem; min-width: 0; m
 .nav-link[aria-current] { background: var(--hl-accent-container); color: var(--hl-on-accent-container); }
 .nav-badge { display: inline-block; min-width: 1.2rem; padding: 0 0.4rem; border-radius: var(--hl-radius-pill); background: var(--hl-accent); color: var(--hl-accent-contrast); font-size: 0.75rem; font-weight: 700; text-align: center; }
 .appbar-actions { display: flex; align-items: center; gap: 0.25rem; margin-left: auto; }
-.avatar { width: 2.5rem; height: 2.5rem; min-height: 0; padding: 0; border-radius: 50%; background: var(--hl-accent-container); color: var(--hl-on-accent-container); border: 2px solid var(--hl-accent); box-shadow: none; font-size: 0.9rem; font-weight: 700; }
+.avatar { display: inline-flex; align-items: center; justify-content: center; line-height: 1; overflow: hidden; width: 2.5rem; height: 2.5rem; min-height: 0; padding: 0; border-radius: 50%; background: var(--hl-accent-container); color: var(--hl-on-accent-container); border: 2px solid var(--hl-accent); box-shadow: none; font-size: 0.9rem; font-weight: 700; }
 .user-menu { position: relative; margin-left: 0.25rem; }
 .user-panel { position: absolute; right: 0; top: calc(100% + 0.5rem); z-index: 40; min-width: 15rem; max-width: calc(100vw - 2rem); padding: 1rem; background: var(--hl-surface); border: 1px solid var(--hl-border); border-radius: var(--hl-radius-card); box-shadow: var(--hl-elev-4); overflow-wrap: anywhere; }
 .user-panel p { margin: 0 0 0.25rem; }
@@ -203,11 +203,11 @@ hl-reminder-banner { margin-bottom: 1.5rem; }
 .post-like.liked { background: var(--hl-accent-container); color: var(--hl-on-accent-container); border-color: var(--hl-accent); }
 .post-like.liked svg { fill: currentColor; }
 .post-comments { display: grid; gap: 0.5rem; }
-.comment { display: flex; gap: 0.5rem; margin: 0; align-items: flex-start; overflow-wrap: anywhere; }
-.avatar.mini { width: 1.75rem; height: 1.75rem; font-size: 0.7rem; flex: none; border-width: 1px; }
+.comment { display: flex; gap: 0.5rem; margin: 0; align-items: baseline; min-width: 0; }
+.comment-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.avatar.mini { width: 28px; height: 28px; min-width: 28px; font-size: 11px; flex: none; border-width: 1px; align-self: flex-start; }
 .comment-box { display: flex; gap: 0.5rem; align-items: center; }
 .comment-box input { flex: 1; }
-.caring-legend { list-style: none; margin: 0.5rem 0 0; padding: 0; display: grid; gap: 0.4rem; }
 .mini-stats { display: grid; gap: 0.5rem; margin: 0 0 0.75rem; }
 .mini-stats div { display: flex; justify-content: space-between; gap: 1rem; }
 .mini-stats dd { margin: 0; font-weight: 700; }
@@ -215,3 +215,4 @@ hl-reminder-banner { margin-bottom: 1.5rem; }
   .wall-layout { grid-template-columns: minmax(0, 1fr); }
   .wall-rail { position: static; order: -1; }
 }
+.plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }

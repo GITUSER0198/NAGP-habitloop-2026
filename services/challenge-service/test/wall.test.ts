@@ -25,7 +25,7 @@ describe('Home wall', () => {
   });
   afterEach(() => { vi.restoreAllMocks(); });
   afterAll(async () => { await app.close(); });
-  async function create(title: string, visibility: 'public' | 'private' = 'public', extra: Record<string, unknown> = {}) {
+  async function create(title: string, visibility: 'public' | 'members' = 'public', extra: Record<string, unknown> = {}) {
     const response = await app.inject({ method: 'POST', url: '/api/challenges', headers: auth(), payload: { title, description: `About ${title}`, visibility, activity_category: 'fitness', start_date: '2026-11-01', end_date: '2026-12-31', target_count: 10, ...extra } });
     expect(response.statusCode, response.body).toBe(201); return response.json() as { id: string };
   }
@@ -35,7 +35,7 @@ describe('Home wall', () => {
   }
   async function firstPostId(): Promise<string> { return (await wall()).posts[0]!.id as string; }
 
-  it('lists newest first with author name, image and CARING value, and pages by 10', async () => {
+  it('lists newest first with author name, image and value chip, and pages by 10', async () => {
     await create('First', 'public', { image_url: '/posts/a.jpg', caring_value: 'Responsible' });
     for (let i = 2; i <= 12; i++) { await new Promise(resolve => setTimeout(resolve, 3)); await create(`Post ${i}`); }
     const first = await wall();
@@ -46,12 +46,14 @@ describe('Home wall', () => {
     expect(second.posts[1]).toMatchObject({ image_url: '/posts/a.jpg', caring_value: 'Responsible' }); expect(second.next_cursor).toBeNull();
     expect((await wall(undefined, friendToken)).posts[0]!.joined_by_me).toBe(false);
   });
-  it('excludes private challenges and posts of other communities', async () => {
-    await create('Secret', 'private'); await create('Open');
-    expect((await wall()).posts.map(row => row.challenge.title)).toEqual(['Open']);
+  it('shows members-only posts to members, flags the owner, and hides other communities', async () => {
+    await create('Secret', 'members'); await create('Open');
+    expect((await wall()).posts.map(row => row.challenge.title).sort()).toEqual(['Open', 'Secret']);
+    expect((await wall()).posts.every(row => row.owned_by_me)).toBe(true);
+    expect((await wall(undefined, friendToken)).posts.some(row => row.owned_by_me)).toBe(false);
     expect((await wall(undefined, foreignToken)).posts).toEqual([]);
-    const secret = (await getPool().query('SELECT p.id FROM "challenges_test"."posts" p JOIN "challenges_test"."challenges" c ON c.id = p.challenge_id WHERE c.visibility = \'private\'')).rows[0].id;
-    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${secret}/like`, headers: auth() })).statusCode).toBe(404);
+    const secret = (await getPool().query("SELECT p.id FROM \"challenges_test\".\"posts\" p JOIN \"challenges_test\".\"challenges\" c ON c.id = p.challenge_id WHERE c.visibility = 'members'")).rows[0].id;
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${secret}/like`, headers: auth(foreignToken) })).statusCode).toBe(404);
   });
   it('toggles likes without duplicates', async () => {
     await create('Likeable'); const id = await firstPostId();

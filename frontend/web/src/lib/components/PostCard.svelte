@@ -97,7 +97,8 @@
       <Icon name="heart" size={18} />{post.liked_by_me ? 'Liked' : 'Like'}
     </button>
     <label class="post-comment-link outlined button" for={`comment-${post.id}`}><Icon name="message" size={18} />Comment</label>
-    {#if post.joined_by_me}<span class="pill tonal"><Icon name="check" size={16} />Joined</span>
+    {#if post.owned_by_me}<span class="pill tonal"><Icon name="trophy" size={16} />Your challenge</span>
+    {:else if post.joined_by_me}<span class="pill tonal"><Icon name="check" size={16} />Joined</span>
     {:else}<button type="button" disabled={joinBusy} onclick={join}>{joinBusy ? 'Joining...' : 'Join challenge'}</button>{/if}
   </div>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -110,7 +111,7 @@
     {/if}
     {#each shown as comment (comment.id)}
       <p class="comment"><span class="avatar mini" aria-hidden="true">{initials(comment.author_name)}</span>
-        <span><strong>{comment.author_name}</strong> {comment.body} <small class="muted">{relativeTime(comment.created_at, now)}</small></span></p>
+        <span class="comment-text"><strong>{comment.author_name}</strong> {comment.body} <small class="muted">{relativeTime(comment.created_at, now)}</small></span></p>
     {/each}
   </div>
   <form class="comment-box" onsubmit={send}>

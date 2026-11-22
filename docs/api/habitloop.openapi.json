@@ -287,7 +287,8 @@
                     "name",
                     "timezone",
                     "created_at",
-                    "community"
+                    "community",
+                    "organization"
                   ],
                   "properties": {
                     "id": {
@@ -326,6 +327,22 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "domain"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
                     }
                   }
                 }
@@ -391,7 +408,8 @@
                     "name",
                     "timezone",
                     "created_at",
-                    "community"
+                    "community",
+                    "organization"
                   ],
                   "properties": {
                     "id": {
@@ -430,6 +448,22 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "domain"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
                     }
                   }
                 }
@@ -839,6 +873,147 @@
                           "type": "string"
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/communities/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "user",
+                    "community"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "tenant_id",
+                        "email",
+                        "name",
+                        "timezone",
+                        "created_at"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "community": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "kind"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1335,6 +1510,125 @@
         }
       }
     },
+    "/api/challenges/wall": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/{post_id}/like": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/{post_id}/comments": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "properties": {
+                  "body": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/comments/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/challenges/": {
       "post": {
         "requestBody": {
@@ -1372,7 +1666,7 @@
                       {
                         "type": "string",
                         "enum": [
-                          "private"
+                          "members"
                         ]
                       }
                     ]
@@ -1393,6 +1687,16 @@
                   "target_count": {
                     "minimum": 1,
                     "type": "integer"
+                  },
+                  "image_url": {
+                    "maxLength": 500,
+                    "pattern": "^(/|https?://)",
+                    "type": "string"
+                  },
+                  "caring_value": {
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "type": "string"
                   }
                 }
               }
@@ -1415,46 +1719,8 @@
         }
       }
     },
-    "/api/challenges/invites": {
+    "/api/challenges/public/{community_id}": {
       "get": {
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/join-by-code": {
-      "post": {
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "type": "object",
-                "required": [
-                  "invite_code"
-                ],
-                "properties": {
-                  "invite_code": {
-                    "pattern": "^[A-Z0-9]{8}$",
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/invites/{challenge_id}/accept": {
-      "post": {
         "parameters": [
           {
             "schema": {
@@ -1462,27 +1728,7 @@
               "type": "string"
             },
             "in": "path",
-            "name": "challenge_id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/invites/{challenge_id}/decline": {
-      "post": {
-        "parameters": [
-          {
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "in": "path",
-            "name": "challenge_id",
+            "name": "community_id",
             "required": true
           }
         ],
@@ -1553,56 +1799,6 @@
         }
       }
     },
-    "/api/challenges/{id}/invites": {
-      "post": {
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "type": "object",
-                "properties": {
-                  "user_ids": {
-                    "type": "array",
-                    "items": {
-                      "format": "uuid",
-                      "type": "string"
-                    }
-                  },
-                  "emails": {
-                    "type": "array",
-                    "items": {
-                      "minLength": 3,
-                      "maxLength": 254,
-                      "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
-                      "type": "string"
-                    }
-                  }
-                },
-                "nullable": true
-              }
-            }
-          }
-        },
-        "parameters": [
-          {
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
     "/api/integrations/health": {
       "get": {
         "responses": {
@@ -1647,6 +1843,12 @@
                         "type": "string",
                         "enum": [
                           "mockrun"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "galaxywatch"
                         ]
                       }
                     ]

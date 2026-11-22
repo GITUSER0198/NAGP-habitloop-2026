@@ -74,7 +74,10 @@ data class WallPost(
     val challenge: WallChallenge = WallChallenge(),
     @SerialName("like_count") val likeCount: Int = 0,
     @SerialName("liked_by_me") val likedByMe: Boolean = false,
-    @SerialName("comment_count") val commentCount: Int = 0
+    @SerialName("comment_count") val commentCount: Int = 0,
+    @SerialName("challenge_id") val challengeId: String = "",
+    @SerialName("joined_by_me") val joinedByMe: Boolean = false,
+    @SerialName("owned_by_me") val ownedByMe: Boolean = false
 )
 
 @Serializable

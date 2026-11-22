@@ -10,6 +10,7 @@ export class HlChallengeCard {
   @Prop() progress = 0;
   @Prop() target = 0;
   @Prop() joined = false;
+  @Prop() owner = false;
   @Prop() invited = false;
   @Prop() busy = false;
   @Event({ bubbles: true, composed: true }) hlJoin!: EventEmitter<void>;
@@ -26,13 +27,11 @@ export class HlChallengeCard {
       <div class="meter" role="progressbar" aria-label="Challenge progress" aria-valuemin={0} aria-valuemax={100}
         aria-valuenow={percentage(progress, target)} aria-valuetext={`${progress} of ${target}`}>
         <span style={{ width: `${percentage(progress, target)}%` }} /></div>
-      {this.joined ? <p class="accent"><strong>Joined</strong></p> : <div class="actions">
+      {this.owner ? <p class="accent"><strong>Your challenge</strong></p> : this.joined ? <p class="accent"><strong>Joined</strong></p> : <div class="actions">
         {this.invited ? [
           <Action label="Accept invitation" busy={this.busy} onClick={() => this.hlAccept.emit()} />,
           <Action label="Decline invitation" busy={this.busy} variant="outlined" onClick={() => this.hlDecline.emit()} />,
-        ] : this.visibility === 'public'
-          ? <Action label="Join challenge" busy={this.busy} onClick={() => this.hlJoin.emit()} />
-          : <p class="muted">Invitation required</p>}
+        ] : <Action label="Join challenge" busy={this.busy} onClick={() => this.hlJoin.emit()} />}
       </div>}
     </article>;
   }

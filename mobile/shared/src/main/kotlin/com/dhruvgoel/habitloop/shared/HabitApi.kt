@@ -83,6 +83,8 @@ class HabitApi(private val baseUrl: String, private val tokenProvider: () -> Str
         return HabitJson.decodeFromString(WallPage.serializer(), check(call("GET", "/api/challenges/wall$q")))
     }
 
+    suspend fun joinChallenge(challengeId: String) { check(call("POST", "/api/challenges/$challengeId/join", "{}")) }
+
     suspend fun like(postId: String) { check(call("POST", "/api/challenges/wall/$postId/like", "{}")) }
 
     suspend fun comments(postId: String): List<WallComment> =

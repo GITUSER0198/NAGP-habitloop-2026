@@ -1,7 +1,6 @@
 import { getContext, setContext } from 'svelte';
 
 export class CommunityState {
-  invites = $state<number | null>(null);
   recommendations = $state<number | null>(null);
 }
 const key = Symbol('community');

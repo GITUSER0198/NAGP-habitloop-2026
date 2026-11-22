@@ -13,8 +13,8 @@ describe('hl-challenge-card', () => {
     expect(page.root!.shadowRoot!.textContent).toContain('3 participants');
   });
 
-  it('supports invitations, joined state, private visibility, and zero targets', async () => {
-    const page = await newSpecPage({ components: [HlChallengeCard], html: '<hl-challenge-card invited visibility="private"></hl-challenge-card>' });
+  it('supports invitations, joined state, members visibility, owner badge and zero targets', async () => {
+    const page = await newSpecPage({ components: [HlChallengeCard], html: '<hl-challenge-card invited visibility="members"></hl-challenge-card>' });
     const accept = jest.fn(), decline = jest.fn();
     page.root!.addEventListener('hlAccept', accept);
     page.root!.addEventListener('hlDecline', decline);
@@ -28,7 +28,11 @@ describe('hl-challenge-card', () => {
     expect(page.root!.shadowRoot!.querySelector('button')).toBeNull();
     page.root!.joined = false; page.root!.invited = false;
     await page.waitForChanges();
-    expect(page.root!.shadowRoot!.textContent).toContain('Invitation required');
+    expect(page.root!.shadowRoot!.querySelector('button')).not.toBeNull();
+    page.root!.owner = true;
+    await page.waitForChanges();
+    expect(page.root!.shadowRoot!.textContent).toContain('Your challenge');
+    expect(page.root!.shadowRoot!.querySelector('button')).toBeNull();
   });
 
   it('blocks both invite actions while busy', async () => {

@@ -5,6 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { getDb, requireInternal, requireUser, signToken } from '@habitloop/shared';
 import { memberships, tenants, users } from '../db/schema.js';
+import { emailDomain, joinOrganization } from '../organization.js';
 
 type UserRow = typeof users.$inferSelect;
 type TenantRow = typeof tenants.$inferSelect;
@@ -16,7 +17,8 @@ const Password = Type.String({ minLength: 1, maxLength: 72 });
 const Detail = Type.Object({ detail: Type.String() });
 const Profile = Type.Object({ id: Type.String(), tenant_id: Type.String(), email: Type.String(), name: Type.String(), timezone: Type.String(), created_at: Type.String() });
 const CommunityRef = Type.Object({ id: Type.String(), name: Type.String(), kind: Type.String() });
-const ProfileWithCommunity = Type.Composite([Profile, Type.Object({ community: CommunityRef })]);
+const OrganizationRef = Type.Union([Type.Object({ id: Type.String(), domain: Type.String() }), Type.Null()]);
+const ProfileWithCommunity = Type.Composite([Profile, Type.Object({ community: CommunityRef, organization: OrganizationRef })]);
 const AuthResponse = Type.Object({ token: Type.String(), user: Profile, community: CommunityRef });
 const MyCommunity = Type.Object({ id: Type.String(), name: Type.String(), kind: Type.String(), description: Type.String(), role: Type.String(), member_count: Type.Number(), active: Type.Boolean() });
 const DiscoverCommunity = Type.Object({ id: Type.String(), name: Type.String(), description: Type.String(), member_count: Type.Number() });
@@ -55,6 +57,10 @@ function publicProfile(row: UserRow, tenantId: string) {
   return { id: row.id, tenant_id: tenantId, email: row.email, name: row.name, timezone: row.timezone, created_at: row.created_at.toISOString() };
 }
 function communityRef(tenant: TenantRow) { return { id: tenant.id, name: tenant.name, kind: tenant.kind }; }
+async function organizationOf(row: UserRow): Promise<{ id: string; domain: string } | null> {
+  const org = row.organization_id ? await findTenant(row.organization_id) : undefined;
+  return org ? { id: org.id, domain: org.slug } : null;
+}
 async function authFor(row: UserRow, tenant: TenantRow) {
   const token = await signToken({ sub: row.id, tenant_id: tenant.id, email: row.email, name: row.name });
   return { token, user: publicProfile(row, tenant.id), community: communityRef(tenant) };
@@ -118,6 +124,8 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       const personal = (await db.insert(tenants).values({ id: personalId, name: 'Personal space', slug: `personal-${id}`,
         kind: 'personal', description: '', owner_id: id, created_at: now }).returning())[0]!;
       await db.insert(memberships).values({ user_id: id, tenant_id: personalId, role: 'owner', joined_at: now });
+      // A non-public email domain joins (or creates) the organization for that domain.
+      await joinOrganization(id, email);
       return reply.code(201).send(await authFor(inserted, personal));
     } catch (error) {
       if (isUniqueViolation(error)) fail(409, 'An account with this email already exists');
@@ -148,7 +156,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const row = await requireActiveMember(identity.userId, identity.tenantId);
     const tenant = await findTenant(identity.tenantId);
     if (!tenant) fail(404, 'User not found');
-    return { ...publicProfile(row, tenant.id), community: communityRef(tenant) };
+    return { ...publicProfile(row, tenant.id), community: communityRef(tenant), organization: await organizationOf(row) };
   });
 
   app.patch('/me', { preHandler: requireUser, schema: { body: Patch, response: { 200: ProfileWithCommunity } } }, async request => {
@@ -165,7 +173,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
       : current;
     const tenant = await findTenant(identity.tenantId);
     if (!tenant) fail(404, 'User not found');
-    return { ...publicProfile(row, tenant.id), community: communityRef(tenant) };
+    return { ...publicProfile(row, tenant.id), community: communityRef(tenant), organization: await organizationOf(row) };
   });
 
   app.get('/communities', { preHandler: requireUser, schema: { response: { 200: Type.Array(MyCommunity) } } }, async request => {
@@ -176,7 +184,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const counts = await memberCounts(rows.map(row => row.tenant.id));
     const mapped = rows.map(row => ({ id: row.tenant.id, name: row.tenant.name, kind: row.tenant.kind, description: row.tenant.description,
       role: row.role, member_count: counts.get(row.tenant.id) ?? 0, active: row.tenant.id === identity.tenantId }));
-    return [...mapped.filter(item => item.kind === 'personal'), ...mapped.filter(item => item.kind !== 'personal')];
+    return ['personal', 'organization', 'community'].flatMap(kind => mapped.filter(item => item.kind === kind));
   });
 
   app.get('/communities/discover', { preHandler: requireUser, schema: { querystring: Type.Object({ q: Type.Optional(Type.String({ maxLength: 100 })) }), response: { 200: Type.Array(DiscoverCommunity) } } }, async request => {
@@ -241,6 +249,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const membership = tenant ? await findMembership(identity.userId, id) : undefined;
     if (!tenant || !membership) fail(404, 'Community not found');
     if (tenant.kind === 'personal') fail(409, 'You cannot leave your Personal space');
+    if (tenant.kind === 'organization') fail(409, 'You cannot leave your organization');
     if (membership.role === 'owner') {
       const owners = await getDb().select({ id: memberships.user_id }).from(memberships).where(and(eq(memberships.tenant_id, id), eq(memberships.role, 'owner')));
       if (owners.length <= 1) fail(409, 'You are the only owner of this community, so you cannot leave it');
@@ -264,6 +273,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const membership = tenant ? await findMembership(identity.userId, id) : undefined;
     if (!tenant || !membership) fail(404, 'Community not found');
     if (tenant.kind === 'personal') fail(409, 'You cannot delete your Personal space');
+    if (tenant.kind === 'organization') fail(409, 'You cannot delete your organization');
     if (membership.role !== 'owner') fail(403, 'Only an owner can delete this community');
     await getDb().update(users).set({ last_tenant_id: null }).where(eq(users.last_tenant_id, id));
     await getDb().delete(memberships).where(eq(memberships.tenant_id, id));
@@ -280,6 +290,7 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     const tenant = await findTenant(body.community_id);
     if (!tenant || !(await findMembership(identity.userId, tenant.id))) fail(403, 'You are not a member of this community');
     const user = await loadUser(identity.userId);
+    if (tenant.kind === 'organization' && tenant.slug !== emailDomain(user.email)) fail(403, 'You are not a member of this community');
     await setLastTenant(user.id, tenant.id);
     return authFor(user, tenant);
   });

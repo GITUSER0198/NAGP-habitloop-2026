@@ -2,7 +2,7 @@ import { index, pgSchema, unique } from 'drizzle-orm/pg-core';
 import { getConfig } from '@habitloop/shared';
 
 const usersSchema = pgSchema(getConfig().dbSchema);
-// A community is a tenant. kind 'personal' is the private per-user space, never listed.
+// A community is a tenant. kind 'personal' is the private per-user space, never listed; kind 'organization' is the email domain, never listed.
 export const tenants = usersSchema.table('tenants', table => ({
   id: table.uuid('id').primaryKey(),
   name: table.varchar('name', { length: 200 }).notNull(),
@@ -19,6 +19,7 @@ export const users = usersSchema.table('users', table => ({
   name: table.varchar('name', { length: 200 }).notNull(),
   timezone: table.varchar('timezone', { length: 100 }).notNull(),
   last_tenant_id: table.uuid('last_tenant_id'),
+  organization_id: table.uuid('organization_id'),
   created_at: table.timestamp('created_at', { withTimezone: true }).notNull()
 }));
 export const memberships = usersSchema.table('memberships', table => ({

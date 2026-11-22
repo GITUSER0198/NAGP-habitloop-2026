@@ -98,6 +98,33 @@ export class Walkthrough {
     check(!discover.some((row) => row.id === this.community.id), 'Deleted community is still listed');
   }
 
+  /** Public challenges are listed to outsiders but need community membership to join; members-only ones stay hidden. */
+  async challengeVisibility(): Promise<void> {
+    const ownerToken = this.token;
+    const base = { activity_category: 'fitness', start_date: '2026-01-01', end_date: '2099-12-31', target_count: 5 };
+    const open = await this.call('POST', '/api/challenges', { ...base, title: 'Smoke public', visibility: 'public' }, {}, 201);
+    const closed = await this.call('POST', '/api/challenges', { ...base, title: 'Smoke members', visibility: 'members' }, {}, 201);
+    check((await this.call('GET', '/api/challenges/feed')).length >= 2, 'Members do not see both challenges');
+    try {
+      const outsider = await this.call('POST', '/api/users/register', {
+        email: `smoke-three-${this.suffix}@example.com`, password: randomBytes(24).toString('base64url'),
+        name: 'Smoke Outsider', timezone: 'UTC',
+      }, {}, 201);
+      this.token = outsider.token;
+      const listed: Row[] = await this.call('GET', `/api/challenges/public/${this.community.id}`);
+      check(listed.some((row) => row.id === open.id), 'The public challenge is not listed for outsiders');
+      check(!listed.some((row) => row.id === closed.id), 'A members-only challenge is listed for outsiders');
+      let refused = false;
+      try { await this.call('POST', `/api/challenges/${open.id}/join`); } catch (error) {
+        if (!(error instanceof HttpError) || error.code !== 409) throw error;
+        refused = true;
+      }
+      check(refused, 'An outsider could join a public challenge without joining the community');
+    } finally {
+      this.token = ownerToken;
+    }
+  }
+
   /** A second user who has not joined must not see the first community's data, and cannot switch into it. */
   async isolation(): Promise<void> {
     const ownerToken = this.token;
@@ -231,6 +258,7 @@ async function main(): Promise<number> {
   const steps: Array<[string, () => Promise<void>]> = [
     ['register (name, email, password only)', () => walkthrough.register()],
     ['create a community', () => walkthrough.createCommunity()],
+    ['challenge visibility (public and members only)', () => walkthrough.challengeVisibility()],
     ['create activity', () => walkthrough.createActivity()],
     ['second user cannot read it before joining', () => walkthrough.isolation()],
     ['log done/missed/completed', () => walkthrough.logStatuses()],

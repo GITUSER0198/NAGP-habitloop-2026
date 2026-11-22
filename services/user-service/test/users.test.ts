@@ -4,6 +4,7 @@ import { SignJWT, decodeJwt, decodeProtectedHeader } from 'jose';
 import type { FastifyInstance } from 'fastify';
 import { initializeUserTables } from '../src/db/init.js';
 import { registerUserRoutes } from '../src/routes/users.js';
+import { emailDomain, isPublicDomain } from '../src/organization.js';
 
 type Account = { token: string; user: { id: string; email: string; tenant_id: string; created_at: string }; community: { id: string; name: string; kind: string } };
 
@@ -80,9 +81,50 @@ describe('User Service HTTP contract', () => {
     expect(body.community).toMatchObject({ name: 'Morning Runners', kind: 'community' });
     expect(tenantOf(body.token)).toBe(body.community.id);
     const mine = (await get('/api/users/communities', body.token)).json() as Array<{ name: string; kind: string; role: string; member_count: number; active: boolean }>;
-    expect(mine.map(item => item.kind)).toEqual(['personal', 'community']);
-    expect(mine[1]).toMatchObject({ name: 'Morning Runners', role: 'owner', member_count: 1, active: true, description: 'Early birds' });
+    expect(mine.map(item => item.kind)).toEqual(['personal', 'organization', 'community']);
+    expect(mine[2]).toMatchObject({ name: 'Morning Runners', role: 'owner', member_count: 1, active: true, description: 'Early birds' });
     expect(mine[0]).toMatchObject({ role: 'owner', member_count: 1, active: false });
+  });
+
+  it('parses email domains and recognises public mail providers', () => {
+    expect(emailDomain('  Dhruv.Goel@Nagarro.COM ')).toBe('nagarro.com');
+    expect(emailDomain('no-at-sign')).toBe('');
+    for (const domain of ['gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'proton.me', 'protonmail.com']) expect(isPublicDomain(domain)).toBe(true);
+    expect(isPublicDomain('nagarro.com')).toBe(false);
+  });
+
+  it('auto-joins the organization of a non-public email domain; the first user becomes owner', async () => {
+    const first = await account('a@nagarro.com');
+    const second = await account('b@nagarro.com');
+    const me = (await get('/api/users/me', first.token)).json();
+    expect(me.organization).toMatchObject({ domain: 'nagarro.com' });
+    expect((await get('/api/users/me', second.token)).json().organization.id).toBe(me.organization.id);
+    const mine = (await get('/api/users/communities', first.token)).json() as Array<{ id: string; name: string; kind: string; role: string; member_count: number }>;
+    expect(mine.find(item => item.kind === 'organization')).toMatchObject({ name: 'nagarro.com', role: 'owner', member_count: 2 });
+    const other = (await get('/api/users/communities', second.token)).json() as Array<{ kind: string; role: string }>;
+    expect(other.find(item => item.kind === 'organization')!.role).toBe('member');
+    const switched = await post('/api/users/switch', second.token, { community_id: me.organization.id });
+    expect(switched.statusCode).toBe(200);
+    expect(switched.json().community).toMatchObject({ name: 'nagarro.com', kind: 'organization' });
+  });
+
+  it('gives public email domains no organization', async () => {
+    const acct = await account('someone@gmail.com');
+    expect((await get('/api/users/me', acct.token)).json().organization).toBeNull();
+    const mine = (await get('/api/users/communities', acct.token)).json() as Array<{ kind: string }>;
+    expect(mine.map(item => item.kind)).toEqual(['personal']);
+  });
+
+  it('keeps organizations out of Discover and isolates them from other domains', async () => {
+    const insider = await account('a@nagarro.com');
+    const outsider = await account('x@example.com');
+    const orgId = (await get('/api/users/me', insider.token)).json().organization.id as string;
+    expect((await get('/api/users/communities/discover', outsider.token)).json()).toEqual([]);
+    expect((await post(`/api/users/communities/${orgId}/join`, outsider.token)).statusCode).toBe(404);
+    expect((await post('/api/users/switch', outsider.token, { community_id: orgId })).statusCode).toBe(403);
+    expect((await post(`/api/users/communities/${orgId}/leave`, insider.token)).statusCode).toBe(409);
+    const names = ((await get('/api/users/communities', outsider.token)).json() as Array<{ name: string }>).map(item => item.name);
+    expect(names).not.toContain('nagarro.com');
   });
 
   it('validates community names (3 to 60 characters) and rejects duplicate names with 409', async () => {

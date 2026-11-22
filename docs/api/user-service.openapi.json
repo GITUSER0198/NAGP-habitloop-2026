@@ -285,7 +285,8 @@
                     "name",
                     "timezone",
                     "created_at",
-                    "community"
+                    "community",
+                    "organization"
                   ],
                   "properties": {
                     "id": {
@@ -324,6 +325,22 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "domain"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
                     }
                   }
                 }
@@ -389,7 +406,8 @@
                     "name",
                     "timezone",
                     "created_at",
-                    "community"
+                    "community",
+                    "organization"
                   ],
                   "properties": {
                     "id": {
@@ -428,6 +446,22 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "domain"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "domain": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
                     }
                   }
                 }
@@ -837,6 +871,147 @@
                           "type": "string"
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/communities/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "user",
+                    "community"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "tenant_id",
+                        "email",
+                        "name",
+                        "timezone",
+                        "created_at"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "tenant_id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "community": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name",
+                        "kind"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "detail"
+                  ],
+                  "properties": {
+                    "detail": {
+                      "type": "string"
                     }
                   }
                 }

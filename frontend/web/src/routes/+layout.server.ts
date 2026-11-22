@@ -2,16 +2,15 @@ import type { LayoutServerLoad } from './$types';
 import type { MyCommunity, TodayItem } from '$lib/types';
 import { api, ApiError, pageError } from '$lib/server/api';
 import { features } from '$lib/config/features';
-import type { Challenge, RecommendationList } from './community';
+import type { RecommendationList } from './community';
 
 export const load: LayoutServerLoad = async (event) => {
   try {
     const badges = await Promise.allSettled([
-      event.locals.user && features.challenges ? api<Challenge[]>(event, '/api/challenges/invites') : [],
       event.locals.user && features.recommendations
         ? api<RecommendationList>(event, '/api/recommendations').then(result => result.recommendations) : []
     ]);
-    const [pendingInvites, pendingRecommendations] = badges.map(result => {
+    const [pendingRecommendations] = badges.map(result => {
       if (result.status === 'fulfilled') return result.value.length;
       if (result.reason instanceof ApiError) return null;
       throw result.reason;
@@ -25,7 +24,7 @@ export const load: LayoutServerLoad = async (event) => {
     return {
       communities,
       community: communities.find(item => item.id === event.locals.user?.tenant_id) ?? null,
-      pendingInvites,
+      organization: communities.find(item => item.kind === 'organization') ?? null,
       pendingRecommendations,
       user: event.locals.user,
       expiresAt: event.locals.expiresAt,

@@ -33,7 +33,7 @@ Use that value to sign in. Existing accounts must have the same password.
 Dhruv Goel owns Morning run and Read a chapter; Test User 1 owns Park walk; Test Users 2 and 3
 own Evening stretch. The seed creates 30 historical logs for the first three activities and a
 few completions for Test Users 2 and 3, a public movement challenge joined by all three test
-users, a private reading challenge (Reading circle) with Test User 1 invited, and one mockfit
+users, a members-only reading challenge (Reading circle) joined by Test User 1, and one mockfit
 link for Dhruv's run. Morning logs
 succeed consistently, while evening logs are mostly missed. Both profiles use UTC to make
 the stored history and aggregate hours reproducible. The run starts scheduled for 8:00 PM
@@ -41,7 +41,7 @@ and gets a timing suggestion for 7:00 AM. The seed leaves suggestions pending fo
 
 Reruns reuse users, activities, challenges and links. History is anchored to the public
 challenge's stored start date, and existing log timestamps are skipped. Interrupted runs
-can resume. An old challenge is reused after its end date without attempting new invitations.
+can resume. An old challenge is reused after its end date without attempting new joins.
 The seed does not overwrite schedules or retain the one-time ingest key. To send your own
 partner events, create a new link in the app or collection and keep its returned key.
 
@@ -92,8 +92,7 @@ Run the exporter again after API changes. For AWS, set `BASE_URL` or pass
 4. Browse the folders for all six services. Activity and challenge creation save
    `activity_id` and `challenge_id`. Set those collection variables to existing demo IDs
    when inspecting seeded records. Adjust `challenge_start_date`, `challenge_end_date`
-   and `started_at` in the environment for your walkthrough dates. Invites accept `emails`, with no invitation saved if
-   any address is unknown or not a member of the active community.
+   and `started_at` in the environment for your walkthrough dates. Challenge visibility is `public` or `members`.
 5. Creating a link saves `link_id` and its one-time `ingest_key`. The ingest request signs
    its exact body in a pre-request script using Postman's Web Crypto support
    ([sandbox reference](https://learning.postman.com/v11/docs/tests-and-scripts/write-scripts/postman-sandbox-reference/pm-require)). Set `event_id`

@@ -18,7 +18,6 @@
   const model = provideState(untrack(() => data.today));
   const community = provideCommunity();
   $effect(() => {
-    community.invites = data.pendingInvites;
     community.recommendations = data.pendingRecommendations;
   });
   let mode = $state('light');
@@ -80,9 +79,7 @@
           <a class="nav-link" href={item.href} title={item.label} aria-current={exact ? 'page' : section ? 'true' : undefined} onclick={() => menuOpen = false}>
             <Icon name={item.icon} />
             <span class="nav-label">{item.label}</span>
-            {#if item.feature === 'challenges' && community.invites}
-              <span class="nav-badge" aria-label={`${community.invites} pending invites`}>{community.invites}</span>
-            {:else if item.feature === 'recommendations' && community.recommendations}
+            {#if item.feature === 'recommendations' && community.recommendations}
               <span class="nav-badge" aria-label={`${community.recommendations} pending recommendations`}>{community.recommendations}</span>
             {/if}
           </a>
@@ -125,6 +122,7 @@
             <div class="user-panel" role="group" aria-label="Account">
               <p class="user-name">{data.user.name}</p>
               <p class="muted">{data.user.email}</p>
+              {#if data.organization}<p class="muted">Organization: {data.organization.name}</p>{/if}
               {#if data.community}<p class="muted">Community: {data.community.name}</p>{/if}
               <form method="POST" action="/logout"><button type="submit" class="outlined"><Icon name="logout" size={18} />Log out</button></form>
             </div>

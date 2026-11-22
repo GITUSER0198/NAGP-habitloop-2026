@@ -83,13 +83,11 @@ reopen the challenge detail. Expected screen: your leaderboard progress increase
 Capture `app-05-challenge-progress.png`. The challenge page is loaded on navigation; its
 leaderboard does not itself subscribe to the dashboard stream.
 
-Optional invitation evidence: create a private challenge and use **Invite or show code**.
-An empty participant email returns an eight-character code. A second user in the same community
-can choose **Join with code**. For a direct invitation, enter the email of a member of this
-community; that user sees **Pending invitations**, with accept and decline actions. An email that
-is unknown or not a member of this community is refused with a clear message. Invitations are
-in-app, with no email delivery. A same-community outsider opening the private detail URL
-receives 404.
+Optional visibility evidence: from **New challenge** inside a community, create one Public and
+one Members only challenge. Another user who has not joined the community sees the public one under
+that community on **Discover** ("Join community to take part") but cannot join it until they join
+the community, and never sees the members-only one. A user outside the community opening the
+members-only detail URL receives 404.
 
 ## 6. Send a wearable event and replay it
 

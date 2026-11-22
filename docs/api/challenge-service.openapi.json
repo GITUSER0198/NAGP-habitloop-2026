@@ -17,6 +17,125 @@
         }
       }
     },
+    "/api/challenges/wall": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "maxLength": 200,
+              "type": "string"
+            },
+            "in": "query",
+            "name": "cursor",
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/{post_id}/like": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/{post_id}/comments": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "body"
+                ],
+                "properties": {
+                  "body": {
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "post_id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/challenges/wall/comments/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/challenges/": {
       "post": {
         "requestBody": {
@@ -54,7 +173,7 @@
                       {
                         "type": "string",
                         "enum": [
-                          "private"
+                          "members"
                         ]
                       }
                     ]
@@ -75,6 +194,16 @@
                   "target_count": {
                     "minimum": 1,
                     "type": "integer"
+                  },
+                  "image_url": {
+                    "maxLength": 500,
+                    "pattern": "^(/|https?://)",
+                    "type": "string"
+                  },
+                  "caring_value": {
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "type": "string"
                   }
                 }
               }
@@ -97,46 +226,8 @@
         }
       }
     },
-    "/api/challenges/invites": {
+    "/api/challenges/public/{community_id}": {
       "get": {
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/join-by-code": {
-      "post": {
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "type": "object",
-                "required": [
-                  "invite_code"
-                ],
-                "properties": {
-                  "invite_code": {
-                    "pattern": "^[A-Z0-9]{8}$",
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/invites/{challenge_id}/accept": {
-      "post": {
         "parameters": [
           {
             "schema": {
@@ -144,27 +235,7 @@
               "type": "string"
             },
             "in": "path",
-            "name": "challenge_id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/invites/{challenge_id}/decline": {
-      "post": {
-        "parameters": [
-          {
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "in": "path",
-            "name": "challenge_id",
+            "name": "community_id",
             "required": true
           }
         ],
@@ -217,56 +288,6 @@
     },
     "/api/challenges/{id}/leave": {
       "post": {
-        "parameters": [
-          {
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "in": "path",
-            "name": "id",
-            "required": true
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response"
-          }
-        }
-      }
-    },
-    "/api/challenges/{id}/invites": {
-      "post": {
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": false,
-                "type": "object",
-                "properties": {
-                  "user_ids": {
-                    "type": "array",
-                    "items": {
-                      "format": "uuid",
-                      "type": "string"
-                    }
-                  },
-                  "emails": {
-                    "type": "array",
-                    "items": {
-                      "minLength": 3,
-                      "maxLength": 254,
-                      "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
-                      "type": "string"
-                    }
-                  }
-                },
-                "nullable": true
-              }
-            }
-          }
-        },
         "parameters": [
           {
             "schema": {

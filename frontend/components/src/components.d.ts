@@ -59,6 +59,7 @@ export namespace Components {
           * @default false
          */
         "joined": boolean;
+        "owner": boolean;
         /**
           * @default 0
          */
@@ -362,6 +363,7 @@ declare namespace LocalJSX {
           * @default false
          */
         "joined"?: boolean;
+        "owner"?: boolean;
         "onHlAccept"?: (event: HlChallengeCardCustomEvent<void>) => void;
         "onHlDecline"?: (event: HlChallengeCardCustomEvent<void>) => void;
         "onHlJoin"?: (event: HlChallengeCardCustomEvent<void>) => void;
@@ -495,6 +497,7 @@ declare namespace LocalJSX {
         "progress": number;
         "target": number;
         "joined": boolean;
+        "owner": boolean;
         "invited": boolean;
         "busy": boolean;
     }

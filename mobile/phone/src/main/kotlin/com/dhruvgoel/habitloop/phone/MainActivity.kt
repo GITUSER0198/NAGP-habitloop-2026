@@ -235,6 +235,11 @@ fun HomeScreen(api: HabitApi) {
                                 Text((if (p.likedByMe) "Liked " else "Like ") + p.likeCount)
                             }
                             TextButton(onClick = { commentFor = p }) { Text("Comment ${p.commentCount}") }
+                            when {
+                                p.ownedByMe -> Text("Your challenge", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                                p.joinedByMe -> Text("Joined", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                                else -> TextButton(onClick = { scope.launch { runCatching { api.joinChallenge(p.challengeId) }; reload() } }) { Text("Join") }
+                            }
                         }
                     }
                 }

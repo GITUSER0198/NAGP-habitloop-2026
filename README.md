@@ -53,7 +53,7 @@ and cannot be reached through nginx or the ALB.
 |---|---|---|---|---|
 | User, `/api/users` | Accounts, login, profile, communities and memberships | PostgreSQL `users` | None / none | `POST /register`, `POST /login`, `GET/PATCH /me`, `GET/POST /communities`, `GET /communities/discover`, `POST /communities/{id}/join`, `POST /communities/{id}/leave`, `POST /switch` |
 | Activity, `/api/activities` | Activity schedules, manual logs and partner log deduplication | PostgreSQL `activities` | Normalizer calls internal HTTP / `ActivityLogged` | `GET/POST` prefix, `GET /today`, `GET/PATCH/DELETE /{id}`, `GET/POST /{id}/logs`, internal log and schedule routes |
-| Challenge, `/api/challenges` | Tenant challenge feed, visibility, participation and invitations | PostgreSQL `challenges` | None / none | `POST` prefix, `GET /feed`, `GET /invites`, `GET /{id}`, `POST /{id}/join`, `POST /join-by-code`, `POST /{id}/invites`, invite accept/decline and leave |
+| Challenge, `/api/challenges` | Community challenge feed, public or members-only visibility and participation | PostgreSQL `challenges` | None / none | `POST` prefix, `GET /feed`, `GET /public/{community_id}`, `GET /{id}`, `POST /{id}/join` and leave |
 | Integration, `/api/integrations` | Provider mapping, per-link key, raw workout storage and ingest | PostgreSQL `integrations` | Normalizer updates event state over internal HTTP / `PartnerEventReceived` | `GET /providers`, `GET/POST /links`, `DELETE /links/{id}`, `GET /links/{id}/events`, `POST /ingest/{link_id}` |
 | Analytics, `/api/analytics` | Read aggregates, progress, streaks, milestones and live summary | DynamoDB; no relational tables | `ActivityLogged` handled by analytics-updater Lambda / none | `GET /summary`, `/trend`, `/heatmap`, `/milestones`, `/cohorts`, `/challenges/{id}/progress`, `/stream`; internal user hours |
 | Recommendation, `/api/recommendations` | Compute and persist timing/frequency suggestions; accept or dismiss | PostgreSQL `recommendations`; reads Activity and Analytics APIs | No subscription / `RecommendationAccepted` | `GET` prefix, `POST /refresh`, `POST /{id}/accept`, `POST /{id}/dismiss` |
@@ -182,13 +182,16 @@ return 502 so the user can retry.
 Accounts are global: sign-up takes name, email and password, login takes email and password, and
 an email can register only once. A community is a tenant. A user belongs to many communities
 through memberships (like Facebook groups), joins public communities by browsing them, and every
-user also has a private Personal space that is never listed. The JWT claim `tenant_id` is the
+user also has a private Personal space that is never listed. A third tenant kind, `organization`, is
+the email domain (for example `nagarro.com`): registering with a non-public domain joins or creates
+it (the first user is owner); public mail domains get none. Organizations never appear in Discover. The JWT claim `tenant_id` is the
 active community; switching communities (`POST /api/users/switch`) issues a new token and the app
 bar switcher replaces the session cookie. JWT claims carry `sub`, `tenant_id`, `email`, and `name`.
 Resource queries use the token's tenant and, for personal resources, user. Other services need no
-community logic. Foreign-tenant resource IDs return 404, and email invites only resolve members
-of the current community. Private challenges also enforce invitation/participant
-visibility within a tenant. DynamoDB partition keys include `TENANT#...#USER#...` or
+community logic. Foreign-tenant resource IDs return 404. A challenge belongs to the community it
+was created in: `public` challenges are listed to every signed-in user (also on Discover) but
+joining needs community membership first (409 "Join the community first"), and `members`
+challenges are visible and joinable by community members only. DynamoDB partition keys include `TENANT#...#USER#...` or
 `TENANT#...#CHALLENGE#...`. Tenant isolation is enforced by application code and covered by
 service tests; it is not database row-level security or a separate AWS account per tenant.
 
@@ -244,7 +247,7 @@ tenant context; CloudWatch aggregates metrics and sends alarms through SNS.
   are not implemented. The cohort UI flag is off by default.
 - SSE is implemented by polling DynamoDB every 3 seconds and proxying the stream through web.
   Browser polling fallback is every 10 seconds. This favors simplicity over push fan-out.
-- Public communities are open to join (no approval or invite codes), mock partners have no OAuth, internal HTTP and
+- Public communities are open to join (no approval needed), mock partners have no OAuth, internal HTTP and
   CloudFront-to-ALB traffic are unencrypted, and no WAF or application rate limiter is configured.
   These are case-study constraints rather than production-hardening claims.
 

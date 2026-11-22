@@ -19,7 +19,7 @@ updates their status props when finished. These components make no requests them
 - `hl-activity-summary`: `name`, `category`, `preferredTime`, `status`, `streak`, `busy`.
   Emits `hlLog` with `{status}` for `done`, `completed`, or `missed`.
 - `hl-challenge-card`: `title`, `visibility`, `participants`, `progress`, `target`, `joined`,
-  `invited`, `busy`. Emits `hlJoin`, `hlAccept`, `hlDecline` with no payload.
+  `owner` (shows "Your challenge" instead of Join or Joined), `invited`, `busy`. Emits `hlJoin`, `hlAccept`, `hlDecline` with no payload.
 - `hl-partner-tile`: `provider`, `linked`, `lastEventAt`, `rejectedCount`, `busy`.
   Emits `hlConnect`, `hlDisconnect` with no payload.
 - `hl-chart`: `type` (`trend` or `bar`), `data`: numbers or `{label, value}` records.

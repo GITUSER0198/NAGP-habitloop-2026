@@ -2,6 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import type { DiscoverCommunity, MyCommunity, User } from '$lib/types';
 import { api, ApiError, pageError } from '$lib/server/api';
+import type { Challenge } from '../community';
 import { safePath, setSession } from '$lib/server/session';
 import { field, post, resourceId } from '../community.server';
 
@@ -14,7 +15,11 @@ export const load: PageServerLoad = async (event) => {
       api<MyCommunity[]>(event, '/api/users/communities'),
       api<DiscoverCommunity[]>(event, `/api/users/communities/discover?q=${encodeURIComponent(q)}`)
     ]);
-    return { mine, discover, q, welcome: event.url.searchParams.get('welcome') === '1' };
+    // Public challenges are visible on each Discover card; joining one needs the community first.
+    const found = await Promise.allSettled(discover.map(item => api<Challenge[]>(event, `/api/challenges/public/${item.id}`)));
+    const publicChallenges: Record<string, Challenge[]> = {};
+    found.forEach((result, index) => { if (result.status === 'fulfilled') publicChallenges[discover[index].id] = result.value; });
+    return { mine, discover, publicChallenges, q, welcome: event.url.searchParams.get('welcome') === '1' };
   } catch (cause) { pageError(cause); }
 };
 

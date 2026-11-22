@@ -53,6 +53,12 @@
                         "enum": [
                           "mockrun"
                         ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "galaxywatch"
+                        ]
                       }
                     ]
                   },

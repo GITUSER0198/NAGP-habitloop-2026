@@ -97,10 +97,13 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 interface PlanItem { api: API; name: string; category: string; hour: number; days: number }
 
-const CARING_COMMUNITY = 'Nagarro CARING Challenges';
-const CARING_DESCRIPTION = "Small daily habits that live Nagarro's CARING values: Client-centric, Agile, Responsible, Intelligent, Non-hierarchical, Global.";
+const CHALLENGES_COMMUNITY = 'Nagarro Challenges';
+const CHALLENGES_DESCRIPTION = 'Small daily habits we take on together at Nagarro.';
 // Joiners, likers and commenters are test user numbers (1 to 3).
-const CARING_POSTS: { title: string; slug: string; category: string; values: string; caption: string; joiners: number[]; likers: number[]; comments: [number, string][] }[] = [
+const CHALLENGE_POSTS: { title: string; slug: string; category: string; values: string; caption: string; joiners: number[]; likers: number[]; comments: [number, string][] }[] = [
+  { title: 'Code Every Day', slug: 'code-every-day', category: 'learning', values: 'Intelligent', joiners: [3], likers: [1],
+    caption: 'Write or read code for at least 20 minutes a day. Small steady practice beats weekend cramming.',
+    comments: [[1, 'Working through a small Rust exercise each day.']] },
   { title: 'Cycle to Work', slug: 'cycle-to-work', category: 'fitness', values: 'Responsible, Global', joiners: [1, 2], likers: [1, 2, 3],
     caption: 'Swap one commute a day for a bike ride. Fewer emissions, more energy, and a better start to the working day.',
     comments: [[1, 'Day 3 done, the route along the canal is lovely.'], [2, 'Joined! Borrowing a bike this week.']] },
@@ -110,16 +113,13 @@ const CARING_POSTS: { title: string; slug: string; category: string; values: str
   { title: 'Sleep by 11', slug: 'sleep-by-11', category: 'health', values: 'Responsible', joiners: [2], likers: [2, 3],
     caption: 'Lights out by 11 PM. Rested people make better decisions and look after their health.',
     comments: [[2, 'Screens off at 10:30 PM is the trick.'], [3, 'Streak of 5 nights so far.'], [1, 'Trying this from tonight.']] },
-  { title: 'Code Every Day', slug: 'code-every-day', category: 'learning', values: 'Intelligent', joiners: [3], likers: [1],
-    caption: 'Write or read code for at least 20 minutes a day. Small steady practice beats weekend cramming.',
-    comments: [[1, 'Working through a small Rust exercise each day.']] },
   { title: 'Stairs Not Lifts', slug: 'stairs-not-lifts', category: 'fitness', values: 'Agile', joiners: [1, 2, 3], likers: [2],
     caption: 'Take the stairs whenever it is five floors or fewer. Quick, free, and everyone can join in.',
     comments: [[2, 'Seventh floor counts, right?'], [1, 'Legs are feeling it already.']] }
 ];
 
-/** The Nagarro CARING community: five posted challenges, joins, likes and comments. Safe to rerun. */
-async function seedCaring(baseUrl: string, password: string): Promise<void> {
+/** The Nagarro Challenges community: five posted challenges, joins, likes and comments. Safe to rerun. */
+async function seedChallenges(baseUrl: string, password: string): Promise<void> {
   const users = [
     await account(baseUrl, 'dhruv.goel@nagarro.com', 'Dhruv Goel', password),
     await account(baseUrl, 'testuser1@example.com', 'Test User 1', password),
@@ -127,17 +127,23 @@ async function seedCaring(baseUrl: string, password: string): Promise<void> {
     await account(baseUrl, 'testuser3@example.com', 'Test User 3', password)
   ];
   const dhruv = users[0];
-  await enter(dhruv, CARING_COMMUNITY, CARING_DESCRIPTION);
-  for (const member of users.slice(1)) await enter(member, CARING_COMMUNITY, CARING_DESCRIPTION);
-  await enter(dhruv, CARING_COMMUNITY, CARING_DESCRIPTION); // last, so it stays Dhruv's last active community
+  // Registration auto-joins the organization of the email domain (nagarro.com, example.com).
+  const organizations = ((await dhruv.call('GET', '/api/users/communities')) as Row[]).filter((row) => row.kind === 'organization');
+  console.log(`Organization tenant: ${organizations.map((row) => row.name).join(', ') || 'none'}`);
+  await enter(dhruv, CHALLENGES_COMMUNITY, CHALLENGES_DESCRIPTION);
+  for (const member of users.slice(1)) await enter(member, CHALLENGES_COMMUNITY, CHALLENGES_DESCRIPTION);
+  await enter(dhruv, CHALLENGES_COMMUNITY, CHALLENGES_DESCRIPTION); // last, so it stays Dhruv's last active community
   const feed: Row[] = await dhruv.call('GET', '/api/challenges/feed');
-  const start = Date.now() - 5 * DAY_MS;
-  for (const item of CARING_POSTS) {
+  const start = Date.now() - 6 * DAY_MS;
+  for (const [index, item] of CHALLENGE_POSTS.entries()) {
+    // Code Every Day is seeded first and starts earliest, so it is last on the newest-first wall and feed.
+    const itemStart = index === 0 ? Date.now() - 32 * DAY_MS : start + index * DAY_MS;
+    const length = index === 0 ? 60 : 29;
     let challenge: Row | undefined = feed.find((row) => row.title === item.title);
     if (challenge === undefined) {
       challenge = await dhruv.call('POST', '/api/challenges', {
         title: item.title, description: item.caption, visibility: 'public', activity_category: item.category,
-        start_date: isoDate(new Date(start)), end_date: isoDate(new Date(start + 29 * DAY_MS)), target_count: 30,
+        start_date: isoDate(new Date(itemStart)), end_date: isoDate(new Date(itemStart + length * DAY_MS)), target_count: 30,
         image_url: `/posts/${item.slug}.jpg`, caring_value: item.values
       });
     }
@@ -150,11 +156,11 @@ async function seedCaring(baseUrl: string, password: string): Promise<void> {
     const wall: Row = await member.call('GET', '/api/challenges/wall');
     for (const post of wall.posts as Row[]) {
       postIds.set(post.challenge.title, post.id);
-      const item = CARING_POSTS.find((row) => row.title === post.challenge.title);
+      const item = CHALLENGE_POSTS.find((row) => row.title === post.challenge.title);
       if (item?.likers.includes(index + 1) && !post.liked_by_me) await member.call('POST', `/api/challenges/wall/${post.id}/like`);
     }
   }
-  for (const item of CARING_POSTS) {
+  for (const item of CHALLENGE_POSTS) {
     const postId = postIds.get(item.title);
     if (postId === undefined) continue;
     const existing: Row[] = await dhruv.call('GET', `/api/challenges/wall/${postId}/comments`);
@@ -162,7 +168,7 @@ async function seedCaring(baseUrl: string, password: string): Promise<void> {
       if (!existing.some((row) => row.body === body)) await users[number].call('POST', `/api/challenges/wall/${postId}/comments`, { body });
     }
   }
-  console.log(`Nagarro CARING community ready: ${CARING_POSTS.length} posted challenges`);
+  console.log(`Nagarro Challenges community ready: ${CHALLENGE_POSTS.length} posted challenges`);
 }
 
 export async function seed(baseUrl: string): Promise<void> {
@@ -205,7 +211,7 @@ export async function seed(baseUrl: string): Promise<void> {
   const challenges: Row[] = [];
   for (const [title, visibility, category] of [
     ['NAGP 30-day movement', 'public', 'fitness'],
-    ['Reading circle', 'private', 'learning'],
+    ['Reading circle', 'members', 'learning'],
   ]) {
     let challenge = feed.find((row) => row.title === title);
     if (challenge === undefined) {
@@ -227,9 +233,9 @@ export async function seed(baseUrl: string): Promise<void> {
     }
   }
   if (String(challenges[1].end_date).slice(0, 10) >= today) {
-    await dhruv.call('POST', `/api/challenges/${challenges[1].id}/invites`, { emails: ['testuser1@example.com'] });
+    await user1.call('POST', `/api/challenges/${challenges[1].id}/join`);
   }
-  console.log('3 of 6: public and private challenges ready');
+  console.log('3 of 6: public and members-only challenges ready');
 
   // A stored challenge date anchors the dataset across reruns and interrupted runs.
   const anchor = dateMs(challenges[0].start_date);
@@ -269,7 +275,7 @@ export async function seed(baseUrl: string): Promise<void> {
 
   const deadline = Date.now() + 90_000;
   await waitForTiming(dhruv, activities, deadline);
-  await seedCaring(baseUrl, password);
+  await seedChallenges(baseUrl, password);
 }
 
 async function waitForTiming(dhruv: API, activities: Row[], deadline: number): Promise<void> {

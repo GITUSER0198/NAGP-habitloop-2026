@@ -6,6 +6,7 @@
   import { app } from '$lib/config/app';
   import Busy from '$lib/components/Busy.svelte';
   import Icon from '$lib/components/Icon.svelte';
+  import { tenantLabel } from '$lib/organization';
 
   let { data, form }: PageProps = $props();
   let mode = $state('register');
@@ -42,6 +43,11 @@
       {/if}
       <label for="email">Email</label><input id="email" type="email" name="email" required maxlength="254" autocomplete="email" bind:value={email} aria-invalid={!!errors.email} aria-describedby="email-error" />
       <small id="email-error" class="error">{errors.email ?? ''}</small>
+      {#if mode === 'register'}
+        <label for="tenant">Tenant</label>
+        <input id="tenant" value={tenantLabel(email)} readonly tabindex="-1" placeholder="Fills in as you type your email" aria-describedby="tenant-hint" />
+        <small id="tenant-hint" class="muted">Your organization is your tenant. Your data stays inside it.</small>
+      {/if}
       <label for="password">Password</label><input id="password" type="password" name="password" required autocomplete={mode === 'register' ? 'new-password' : 'current-password'} aria-invalid={!!errors.password} aria-describedby="password-error" />
       <small id="password-error" class="error">{errors.password ?? ''}</small>
       {#if errors.timezone}<p class="error" role="alert">{errors.timezone}</p>{/if}

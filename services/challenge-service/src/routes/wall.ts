@@ -31,10 +31,10 @@ async function authorNames(request: FastifyRequest, ids: string[]): Promise<Name
   return names;
 }
 
-/** A public-challenge post in the caller's community, else 404 (private challenges never reach the wall). */
+/** A post in the caller's community, else 404. */
 async function getPost(id: string, identity: Identity): Promise<typeof posts.$inferSelect> {
   const row = (await getDb().select({ post: posts }).from(posts).innerJoin(challenges, and(eq(challenges.id, posts.challenge_id), eq(challenges.tenant_id, posts.tenant_id)))
-    .where(and(eq(posts.id, id), eq(posts.tenant_id, identity.tenantId), eq(challenges.visibility, 'public'))).limit(1))[0];
+    .where(and(eq(posts.id, id), eq(posts.tenant_id, identity.tenantId))).limit(1))[0];
   if (!row) fail(404, 'Post not found');
   return row.post;
 }
@@ -56,7 +56,7 @@ function commentView(row: CommentRow, names: Names) {
 export async function registerWallRoutes(app: FastifyInstance): Promise<void> {
   app.get('/wall', { onRequest: requireUser, schema: { querystring: Type.Object({ cursor: Type.Optional(Type.String({ maxLength: 200 })) }) } }, async request => {
     const identity = idn(request); const { cursor } = request.query as { cursor?: string };
-    const where = [eq(posts.tenant_id, identity.tenantId), eq(challenges.visibility, 'public')];
+    const where = [eq(posts.tenant_id, identity.tenantId)];
     if (cursor) { const c = decodeCursor(cursor); where.push(or(lt(posts.created_at, c.at), and(eq(posts.created_at, c.at), lt(posts.id, c.id)))!); }
     const db = getDb();
     const rows = await db.select({ post: posts, challenge: challenges }).from(posts)
@@ -81,11 +81,11 @@ export async function registerWallRoutes(app: FastifyInstance): Promise<void> {
       return {
         id: post.id, challenge_id: post.challenge_id, author_id: post.author_id, author_name: names.get(post.author_id) ?? 'Member', caption: post.caption,
         image_url: post.image_url, caring_value: post.caring_value, created_at: post.created_at,
-        challenge: { id: challenge.id, title: challenge.title, activity_category: challenge.activity_category, start_date: challenge.start_date, end_date: challenge.end_date, target_count: challenge.target_count },
+        challenge: { id: challenge.id, owner_id: challenge.owner_id, visibility: challenge.visibility, title: challenge.title, activity_category: challenge.activity_category, start_date: challenge.start_date, end_date: challenge.end_date, target_count: challenge.target_count },
         like_count: mine.length, liked_by_me: mine.some(like => like.user_id === identity.userId),
         comment_count: Number(counts.find(row => row.post_id === post.id)?.total ?? 0),
         latest_comments: (latest[index] ?? []).map(row => commentView(row, names)),
-        participant_count: members.length, joined_by_me: members.some(row => row.user_id === identity.userId)
+        owned_by_me: challenge.owner_id === identity.userId, participant_count: members.length, joined_by_me: members.some(row => row.user_id === identity.userId)
       };
     });
     return { posts: items, next_cursor: rows.length > PAGE_SIZE ? encodeCursor(page[page.length - 1]!.post) : null };

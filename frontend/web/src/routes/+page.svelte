@@ -2,10 +2,9 @@
   import { onMount, untrack } from 'svelte';
   import type { PageProps } from './$types';
   import { app } from '$lib/config/app';
-  import { rememberOpen } from '$lib/disclosure';
-  import PostCard from '$lib/components/PostCard.svelte';
+    import PostCard from '$lib/components/PostCard.svelte';
   import Icon from '$lib/components/Icon.svelte';
-  import { CARING_VALUES, type WallPage } from '$lib/wall';
+  import type { WallPage } from '$lib/wall';
 
   let { data }: PageProps = $props();
   let posts = $state(untrack(() => data.wall.posts));
@@ -31,11 +30,11 @@
 <svelte:head><title>Home | {app.name}</title></svelte:head>
 <div class="wall-layout">
   <section class="stack wall-feed" aria-label="Community wall">
-    <div class="page-heading"><h1>Home</h1><a class="button outlined" href="/challenges"><Icon name="plus" size={18} />New challenge</a></div>
+    <div class="page-heading"><h1>Home</h1><a class="button outlined" href="/challenges/new"><Icon name="plus" size={18} />New challenge</a></div>
     {#each posts as post (post.id)}<PostCard {post} {now} />
     {:else}
       <div class="card"><h2>Nothing posted yet</h2><p class="muted">Challenges you and your community create show up here. Start the first one.</p>
-        <a class="button" href="/challenges">Create a challenge</a></div>
+        <a class="button" href="/challenges/new">Create a challenge</a></div>
     {/each}
     {#if cursor}
       <button type="button" class="outlined" disabled={loading} onclick={more}>{loading ? 'Loading...' : 'Show more posts'}</button>
@@ -47,9 +46,6 @@
       <h2>{data.community?.name ?? 'Your community'}</h2>
       {#if data.community}<p class="muted">{data.community.member_count} {data.community.member_count === 1 ? 'member' : 'members'}</p>
         {#if data.community.description}<p>{data.community.description}</p>{/if}{/if}
-      <details use:rememberOpen={'wall-caring'}><summary>CARING values</summary>
-        <ul class="caring-legend">{#each CARING_VALUES as [letter, name]}<li><span class="pill tonal">{letter}</span> {name}</li>{/each}</ul>
-      </details>
     </section>
     <section class="card"><h2>Your progress</h2>
       {#if data.summary}

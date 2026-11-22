@@ -45,6 +45,7 @@
           {#if item.description}<p class="muted">{item.description}</p>{/if}
           <p class="chips">
             <span class="pill">{item.kind === 'personal' ? 'Private to you' : members(item.member_count)}</span>
+            {#if item.kind === 'organization'}<span class="pill tonal">Organization</span>{/if}
             <span class="pill">{item.role === 'owner' ? 'Owner' : 'Member'}</span>
           </p>
           <div class="actions">
@@ -56,7 +57,7 @@
             {:else}
               <a class="button secondary" href="/dashboard">Open dashboard</a>
             {/if}
-            {#if item.kind !== 'personal'}
+            {#if item.kind === 'community'}
               <form method="POST" action="?/leave" use:enhance={submit('Leaving community')}>
                 <input type="hidden" name="community_id" value={item.id} /><input type="hidden" name="community_name" value={item.name} />
                 <button class="outlined" disabled={!!busy}>Leave</button>
@@ -81,6 +82,14 @@
           <div class="card-head"><span class="icon-tile"><Icon name="users" /></span><h3>{item.name}</h3></div>
           {#if item.description}<p class="muted">{item.description}</p>{/if}
           <p class="chips"><span class="pill">{members(item.member_count)}</span></p>
+          {#if data.publicChallenges[item.id]?.length}
+            <h4>Public challenges</h4>
+            <ul class="plain-list">
+              {#each data.publicChallenges[item.id] as challenge (challenge.id)}
+                <li><strong>{challenge.title}</strong> <small class="muted">Join community to take part</small></li>
+              {/each}
+            </ul>
+          {/if}
           <form method="POST" action="?/join" use:enhance={submit('Joining community')}>
             <input type="hidden" name="community_id" value={item.id} />
             <button disabled={!!busy}>Join</button>

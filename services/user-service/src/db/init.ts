@@ -19,8 +19,9 @@ export async function initializeUserTables(): Promise<void> {
   )`);
   await pool.query(`CREATE TABLE IF NOT EXISTS "${schema}"."users" (
     id uuid PRIMARY KEY, email varchar(254) NOT NULL UNIQUE, password_hash varchar(60) NOT NULL,
-    name varchar(200) NOT NULL, timezone varchar(100) NOT NULL, last_tenant_id uuid, created_at timestamptz NOT NULL
+    name varchar(200) NOT NULL, timezone varchar(100) NOT NULL, last_tenant_id uuid, organization_id uuid, created_at timestamptz NOT NULL
   )`);
+  await pool.query(`ALTER TABLE "${schema}"."users" ADD COLUMN IF NOT EXISTS organization_id uuid`);
   await pool.query(`CREATE TABLE IF NOT EXISTS "${schema}"."memberships" (
     user_id uuid NOT NULL REFERENCES "${schema}"."users"(id), tenant_id uuid NOT NULL REFERENCES "${schema}"."tenants"(id),
     role varchar(20) NOT NULL, joined_at timestamptz NOT NULL,
