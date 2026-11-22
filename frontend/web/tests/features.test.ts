@@ -11,7 +11,7 @@ test('disabled features guard both navigation destinations and API routes', () =
     ['leaderboard', ['/leaderboard', '/api/analytics/challenges/example/progress']],
     ['heatmap', ['/heatmap', '/api/analytics/heatmap']],
     ['categories', ['/categories', '/api/activities/categories']],
-    ['reminders', ['/reminders']], ['cohorts', ['/cohorts', '/api/analytics/cohorts']]
+    ['wall', ['/api/wall/example']], ['reminders', ['/reminders']], ['cohorts', ['/cohorts', '/api/analytics/cohorts']]
   ];
   for (const [feature, paths] of cases) {
     const previous = features[feature];

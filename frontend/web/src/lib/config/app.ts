@@ -5,6 +5,7 @@ export const app = {
   name: 'HabitLoop',
   tagline: 'Small steps. Lasting habits.',
   nav: [
+    { href: '/', label: 'Home', icon: 'home', feature: 'wall' },
     { href: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { href: '/activities/new', label: 'New activity', icon: 'plus' },
     { href: '/challenges', label: 'Challenges', icon: 'trophy', feature: 'challenges' },

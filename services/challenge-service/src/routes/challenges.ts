@@ -3,13 +3,15 @@ import { Type, type Static } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { and, asc, desc, eq, inArray, lte, gte, or } from 'drizzle-orm';
 import { getConfig, getDb, invalidInput, requireInternal, requireUser } from '@habitloop/shared';
-import { challenges, participants } from '../db/schema.js';
+import { challenges, participants, posts } from '../db/schema.js';
+import { registerWallRoutes } from './wall.js';
 
 const Uuid = Type.String({ format: 'uuid' });
 const Email = Type.String({ minLength: 3, maxLength: 254, pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$' });
 const Create = Type.Object({ title: Type.String({ minLength: 1, maxLength: 200 }), description: Type.Optional(Type.String({ maxLength: 10000 })),
   visibility: Type.Optional(Type.Union([Type.Literal('public'), Type.Literal('private')])), activity_category: Type.String({ minLength: 1, maxLength: 100 }),
-  start_date: Type.String({ format: 'date' }), end_date: Type.String({ format: 'date' }), target_count: Type.Integer({ minimum: 1 }) }, { additionalProperties: false });
+  start_date: Type.String({ format: 'date' }), end_date: Type.String({ format: 'date' }), target_count: Type.Integer({ minimum: 1 }),
+  image_url: Type.Optional(Type.String({ maxLength: 500, pattern: '^(/|https?://)' })), caring_value: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })) }, { additionalProperties: false });
 const Invite = Type.Object({ user_ids: Type.Optional(Type.Array(Uuid)), emails: Type.Optional(Type.Array(Email)) }, { additionalProperties: false });
 const JoinCode = Type.Object({ invite_code: Type.String({ pattern: '^[A-Z0-9]{8}$' }) }, { additionalProperties: false });
 type Identity = { userId: string; tenantId: string };
@@ -68,11 +70,12 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
   app.addHook('preValidation', async request => {
     const body = request.body as Record<string, unknown> | null;
     if (body && typeof body === 'object') {
-      for (const field of ['title', 'activity_category', 'invite_code']) if (typeof body[field] === 'string') body[field] = body[field].trim();
+      for (const field of ['title', 'activity_category', 'invite_code', 'body']) if (typeof body[field] === 'string') body[field] = body[field].trim();
       if (Array.isArray(body.emails)) body.emails = body.emails.map(value => typeof value === 'string' ? value.trim() : value);
       if (Array.isArray(body.user_ids)) body.user_ids = body.user_ids.map(value => typeof value === 'string' ? value.toLowerCase() : value);
     }
   });
+  await registerWallRoutes(app);
   app.post('/', { onRequest: requireUser, schema: { body: Create } }, async (request, reply) => {
     const body = request.body as Static<typeof Create>;
     const title = body.title.trim(); const category = body.activity_category.trim();
@@ -84,6 +87,7 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
           title, description: body.description ?? '', visibility: body.visibility ?? 'public', invite_code, activity_category: category,
           start_date: body.start_date, end_date: body.end_date, target_count: body.target_count }).returning())[0]!;
         await getDb().insert(participants).values({ tenant_id: created.tenant_id, challenge_id: created.id, user_id: created.owner_id, status: 'joined', joined_at: new Date() });
+        await getDb().insert(posts).values({ id: randomUUID(), tenant_id: created.tenant_id, challenge_id: created.id, author_id: created.owner_id, caption: created.description, image_url: body.image_url ?? null, caring_value: body.caring_value ?? null });
         return reply.code(201).send(created);
       } catch (error) { if ((error as { cause?: { code?: string } }).cause?.code !== '23505' && (error as { code?: string }).code !== '23505') throw error; }
     }

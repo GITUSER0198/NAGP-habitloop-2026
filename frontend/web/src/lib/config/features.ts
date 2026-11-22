@@ -1,4 +1,5 @@
 export const features = {
+  wall: true,
   challenges: true,
   integrations: true,
   recommendations: true,
@@ -14,6 +15,7 @@ export type Feature = keyof typeof features;
 
 export function disabledRoute(path: string): boolean {
   const routes: [RegExp, Feature][] = [
+    [/^\/api\/wall(?:\/|$)/, 'wall'],
     [/^\/(?:api\/)?challenges(?:\/|$)/, 'challenges'],
     [/^\/(?:api\/)?integrations(?:\/|$)/, 'integrations'],
     [/^\/(?:api\/)?recommendations(?:\/|$)/, 'recommendations'],

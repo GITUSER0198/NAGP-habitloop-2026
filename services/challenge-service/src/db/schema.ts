@@ -15,3 +15,16 @@ export const participants = schema.table('participants', {
 }, table => [primaryKey({ name: 'pk_participants', columns: [table.challenge_id, table.user_id, table.tenant_id] }),
   foreignKey({ name: 'fk_participant_challenge_tenant', columns: [table.tenant_id, table.challenge_id], foreignColumns: [challenges.tenant_id, challenges.id] }),
   index('ix_participants_user').on(table.tenant_id, table.user_id, table.status)]);
+export const posts = schema.table('posts', {
+  id: uuid('id').primaryKey(), tenant_id: uuid('tenant_id').notNull(), challenge_id: uuid('challenge_id').notNull(), author_id: uuid('author_id').notNull(),
+  caption: text('caption').notNull().default(''), image_url: text('image_url'), caring_value: varchar('caring_value', { length: 100 }),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [unique('uq_posts_challenge').on(table.challenge_id), index('ix_posts_tenant_created').on(table.tenant_id, table.created_at)]);
+export const postLikes = schema.table('post_likes', {
+  post_id: uuid('post_id').notNull(), user_id: uuid('user_id').notNull(), tenant_id: uuid('tenant_id').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [unique('uq_post_likes').on(table.post_id, table.user_id), index('ix_post_likes_post').on(table.post_id)]);
+export const postComments = schema.table('post_comments', {
+  id: uuid('id').primaryKey(), post_id: uuid('post_id').notNull(), tenant_id: uuid('tenant_id').notNull(), author_id: uuid('author_id').notNull(),
+  body: varchar('body', { length: 1000 }).notNull(), created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+}, table => [index('ix_post_comments_post').on(table.post_id, table.created_at)]);

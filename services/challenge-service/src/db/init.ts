@@ -16,4 +16,19 @@ export async function initializeChallengeTables(): Promise<void> {
     CONSTRAINT fk_participant_challenge_tenant FOREIGN KEY (tenant_id,challenge_id) REFERENCES "${schema}"."challenges"(tenant_id,id)
   )`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "ix_participants_user" ON "${schema}"."participants" (tenant_id,user_id,status)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS "${schema}"."posts" (
+    id uuid PRIMARY KEY, tenant_id uuid NOT NULL, challenge_id uuid NOT NULL, author_id uuid NOT NULL, caption text NOT NULL DEFAULT '',
+    image_url text, caring_value varchar(100), created_at timestamptz NOT NULL DEFAULT now(), CONSTRAINT uq_posts_challenge UNIQUE (challenge_id)
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "ix_posts_tenant_created" ON "${schema}"."posts" (tenant_id,created_at)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS "${schema}"."post_likes" (
+    post_id uuid NOT NULL, user_id uuid NOT NULL, tenant_id uuid NOT NULL, created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT uq_post_likes UNIQUE (post_id,user_id)
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "ix_post_likes_post" ON "${schema}"."post_likes" (post_id)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS "${schema}"."post_comments" (
+    id uuid PRIMARY KEY, post_id uuid NOT NULL, tenant_id uuid NOT NULL, author_id uuid NOT NULL, body varchar(1000) NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS "ix_post_comments_post" ON "${schema}"."post_comments" (post_id,created_at)`);
 }

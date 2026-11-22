@@ -30,7 +30,7 @@
   const reloadPath = $derived.by(() => {
     const parts = page.url.pathname.split('/').filter(Boolean);
     const top = parts.length > 1 && !(parts[0] === 'activities' && parts[1] === 'new') ? `/${parts[0]}` : page.url.pathname;
-    return top === '/' ? '/dashboard' : top;
+    return top;
   });
   const nav = app.nav.filter(item => !item.feature || features[item.feature]);
   const snoozeKey = $derived(`habitloop:snoozes:${data.user?.tenant_id}:${data.user?.id}`);
@@ -72,7 +72,7 @@
       <button class="icon-btn menu-button" aria-expanded={menuOpen} aria-controls="main-nav" onclick={(event) => { event.stopPropagation(); menuOpen = !menuOpen; }}>
         <Icon name="menu" /><span class="sr-only">Menu</span>
       </button>
-      <a class="brand" href="/dashboard"><span class="logo-mark"><Icon name="loop" size={22} /></span><span class="wordmark">{app.name}</span></a>
+      <a class="brand" href="/"><span class="logo-mark"><Icon name="loop" size={22} /></span><span class="wordmark">{app.name}</span></a>
       <nav id="main-nav" class:menu-open={menuOpen} aria-label="Main navigation">
         {#each nav as item}
           {@const exact = page.url.pathname === item.href}

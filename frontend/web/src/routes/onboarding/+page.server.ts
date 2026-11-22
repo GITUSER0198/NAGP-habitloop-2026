@@ -5,7 +5,7 @@ import { api, ApiError } from '$lib/server/api';
 import { setSession } from '$lib/server/session';
 
 export const load: PageServerLoad = ({ locals, url }) => {
-  if (locals.user) redirect(303, '/dashboard');
+  if (locals.user) redirect(303, '/');
   return { expired: url.searchParams.get('message') === 'expired' };
 };
 
@@ -31,7 +31,7 @@ async function authenticate(event: Parameters<Actions[string]>[0], mode: 'regist
     if (!Object.keys(errors).length) errors[mode === 'login' && cause.status === 401 ? 'password' : mode === 'register' && cause.status === 409 ? 'email' : '_form'] = cause.message;
     return fail(cause.status, { mode, values, errors });
   }
-  redirect(303, mode === 'register' ? '/communities?welcome=1' : '/dashboard');
+  redirect(303, mode === 'register' ? '/communities?welcome=1' : '/');
 }
 
 export const actions: Actions = {

@@ -155,7 +155,7 @@ try {
   await page.getByLabel('Email', { exact: true }).fill(email);
   await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).last().click();
-  await page.waitForURL('**/dashboard');
+  await page.waitForURL(url => url.pathname === '/');
 
   console.log('7 of 8: cross-tenant activity is hidden and returns 404');
   const otherContext = await browser.newContext();
