@@ -303,6 +303,15 @@ export async function registerUserRoutes(app: FastifyInstance): Promise<void> {
     return publicProfile(row, tenant_id);
   });
 
+  // Communities a user belongs to (all kinds), for the Challenge Service cross-community feed. Caller must be that user.
+  app.get('/internal/users/:id/communities', { preHandler: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ id: Type.String({ format: 'uuid' }) }) } }, async request => {
+    const { id } = request.params as { id: string };
+    if (id !== request.user!.userId) fail(404, 'User not found');
+    const rows = await getDb().select({ tenant: tenants }).from(memberships).innerJoin(tenants, eq(memberships.tenant_id, tenants.id))
+      .where(eq(memberships.user_id, id)).orderBy(asc(memberships.joined_at));
+    return rows.map(row => ({ id: row.tenant.id, name: row.tenant.name, kind: row.tenant.kind }));
+  });
+
   app.get('/internal/users/:id', { preHandler: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ id: Type.String({ format: 'uuid' }) }) } }, async request => {
     const { id } = request.params as { id: string };
     const identity = request.user!;

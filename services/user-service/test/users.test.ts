@@ -371,4 +371,15 @@ describe('User Service HTTP contract', () => {
       expect(envelope.source).toBe('habitloop.user-service-test');
     } finally { fetch.mockRestore(); }
   });
+
+  it('lists own communities for the cross-community feed (internal, self only)', async () => {
+    const alex = await account(); const sam = await account('sam@example.com');
+    const book = (await createCommunity(alex.token, 'Book Club')).json() as Account;
+    const headers = { ...bearer(book.token), 'x-internal-token': process.env.INTERNAL_TOKEN! };
+    const mine = await app.inject({ method: 'GET', url: `/api/users/internal/users/${alex.user.id}/communities`, headers });
+    expect(mine.statusCode).toBe(200);
+    expect((mine.json() as { name: string; kind: string }[]).map(item => item.kind).sort()).toEqual(['community', 'organization', 'personal']);
+    expect((await app.inject({ method: 'GET', url: `/api/users/internal/users/${sam.user.id}/communities`, headers })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: `/api/users/internal/users/${alex.user.id}/communities`, headers: bearer(book.token) })).statusCode).toBe(401);
+  });
 });

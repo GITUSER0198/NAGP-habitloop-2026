@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Type, type Static } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { and, asc, desc, eq, lte, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, gte } from 'drizzle-orm';
 import { getDb, invalidInput, requireInternal, requireUser } from '@habitloop/shared';
 import { challenges, participants, posts } from '../db/schema.js';
 import { registerWallRoutes } from './wall.js';
+import { memberCommunities } from './membership.js';
 
 const Uuid = Type.String({ format: 'uuid' });
 // A challenge belongs to the community (tenant) it was created in. public: listed to every signed-in
@@ -12,13 +13,15 @@ const Uuid = Type.String({ format: 'uuid' });
 const Create = Type.Object({ title: Type.String({ minLength: 1, maxLength: 200 }), description: Type.Optional(Type.String({ maxLength: 10000 })),
   visibility: Type.Optional(Type.Union([Type.Literal('public'), Type.Literal('members')])), activity_category: Type.String({ minLength: 1, maxLength: 100 }),
   start_date: Type.String({ format: 'date' }), end_date: Type.String({ format: 'date' }), target_count: Type.Integer({ minimum: 1 }),
-  image_url: Type.Optional(Type.String({ maxLength: 500, pattern: '^(/|https?://)' })), caring_value: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })) }, { additionalProperties: false });
+  image_url: Type.Optional(Type.String({ maxLength: 500, pattern: '^(/|https?://)' })), caring_value: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })), community_id: Type.Optional(Uuid) }, { additionalProperties: false });
 type Identity = { userId: string; tenantId: string };
 function fail(statusCode: number, message: string): never { throw Object.assign(new Error(message), { statusCode }); }
 function today(): string { return new Date().toISOString().slice(0, 10); }
 function idn(request: FastifyRequest): Identity { return request.user!; }
-async function getChallenge(id: string, identity: Identity) {
-  const row = (await getDb().select().from(challenges).where(and(eq(challenges.id, id), eq(challenges.tenant_id, identity.tenantId))).limit(1))[0];
+/** A challenge of any community the caller belongs to (not only the active one), else 404. */
+async function getChallenge(id: string, request: FastifyRequest) {
+  const tenantIds = (await memberCommunities(request)).map(item => item.id);
+  const row = (await getDb().select().from(challenges).where(and(eq(challenges.id, id), inArray(challenges.tenant_id, tenantIds))).limit(1))[0];
   if (!row) fail(404, 'Challenge not found'); return row;
 }
 async function participant(challenge: typeof challenges.$inferSelect, userId: string) {
@@ -48,7 +51,10 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
     const body = request.body as Static<typeof Create>;
     const title = body.title.trim(); const category = body.activity_category.trim();
     if (!title || !category || body.end_date < body.start_date) invalidInput('end_date must be on or after start_date', body);
-    const created = (await getDb().insert(challenges).values({ id: randomUUID(), tenant_id: idn(request).tenantId, owner_id: idn(request).userId,
+    // Created in the chosen community (must be a member), else in the active one.
+    const tenantId = body.community_id ?? idn(request).tenantId;
+    if (!(await memberCommunities(request)).some(item => item.id === tenantId)) fail(403, 'Not a member of this community');
+    const created = (await getDb().insert(challenges).values({ id: randomUUID(), tenant_id: tenantId, owner_id: idn(request).userId,
       title, description: body.description ?? '', visibility: body.visibility ?? 'public', activity_category: category,
       start_date: body.start_date, end_date: body.end_date, target_count: body.target_count }).returning())[0]!;
     await getDb().insert(participants).values({ tenant_id: created.tenant_id, challenge_id: created.id, user_id: created.owner_id, status: 'joined', joined_at: new Date() });
@@ -58,6 +64,12 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
   // Every challenge of the active community (the token's tenant): all members may see public and members-only ones.
   app.get('/feed', { onRequest: requireUser }, async request => {
     return getDb().select().from(challenges).where(eq(challenges.tenant_id, idn(request).tenantId)).orderBy(desc(challenges.start_date), asc(challenges.id));
+  });
+  // Challenges across every community I belong to, plus the communities, for the grouped Challenges page.
+  app.get('/mine', { onRequest: requireUser }, async request => {
+    const communities = await memberCommunities(request);
+    const rows = await getDb().select().from(challenges).where(inArray(challenges.tenant_id, communities.map(item => item.id))).orderBy(desc(challenges.start_date), asc(challenges.id));
+    return { communities, challenges: rows };
   });
   // Public challenges of any community, for Discover. Members-only challenges never appear here.
   app.get('/public/:community_id', { onRequest: requireUser, schema: { params: Type.Object({ community_id: Uuid }) } }, async request => {
@@ -71,10 +83,11 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
     const rows = await getDb().select({ id: challenges.id }).from(challenges).innerJoin(participants, and(eq(participants.challenge_id, challenges.id), eq(participants.tenant_id, challenges.tenant_id))).where(and(...where)).orderBy(asc(challenges.id));
     return rows.map(row => row.id);
   });
-  app.get('/:id', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async request => getChallenge((request.params as { id: string }).id, idn(request)));
+  app.get('/:id', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async request => getChallenge((request.params as { id: string }).id, request));
   app.post('/:id/join', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async request => {
     const id = (request.params as { id: string }).id;
-    const mine = (await getDb().select().from(challenges).where(and(eq(challenges.id, id), eq(challenges.tenant_id, idn(request).tenantId))).limit(1))[0];
+    const tenantIds = (await memberCommunities(request)).map(item => item.id);
+    const mine = (await getDb().select().from(challenges).where(and(eq(challenges.id, id), inArray(challenges.tenant_id, tenantIds))).limit(1))[0];
     if (!mine) {
       // A public challenge of another community is visible, but taking part needs community membership first.
       const other = (await getDb().select({ id: challenges.id }).from(challenges).where(and(eq(challenges.id, id), eq(challenges.visibility, 'public'))).limit(1))[0];
@@ -84,7 +97,7 @@ export async function registerChallengeRoutes(app: FastifyInstance): Promise<voi
     return join(mine, idn(request).userId);
   });
   app.post('/:id/leave', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async request => {
-    const challenge = await getChallenge((request.params as { id: string }).id, idn(request)); const member = await participant(challenge, idn(request).userId);
+    const challenge = await getChallenge((request.params as { id: string }).id, request); const member = await participant(challenge, idn(request).userId);
     if (!member || !['joined', 'left'].includes(member.status)) fail(404, 'Participation not found');
     if (member.status === 'left') return member;
     return (await getDb().update(participants).set({ status: 'left' }).where(and(eq(participants.tenant_id, challenge.tenant_id), eq(participants.challenge_id, challenge.id), eq(participants.user_id, idn(request).userId))).returning())[0];

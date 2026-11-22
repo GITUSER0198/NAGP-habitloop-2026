@@ -17,3 +17,8 @@ setDbForTests(drizzle(async (query, params) => {
   return { rows: result.rows.map(row => Object.entries(row).map(([key, value]) =>
     (key === 'start_date' || key === 'end_date') && value instanceof Date ? value.toISOString().slice(0, 10) : value)) };
 }) as never);
+// The cross-community lookup calls the User Service; tests answer it locally. Without an override the lookup
+// fails fast and the caller is treated as a member of the active community only.
+const realFetch = globalThis.fetch;
+globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+  String(input).includes('/internal/users/') ? new Response('{}', { status: 503 }) : realFetch(input, init)) as typeof fetch;

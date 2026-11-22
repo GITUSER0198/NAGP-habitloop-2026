@@ -10,6 +10,8 @@ describe('Home wall', () => {
   const otherTenant = '33333333-3333-4333-8333-333333333333';
   const owner = '22222222-2222-4222-8222-222222222222';
   const friend = '44444444-4444-4444-8444-444444444444';
+  const stranger = '55555555-5555-4555-8555-555555555555';
+  let members: Record<string, string[]> = {};
   let ownerToken: string; let friendToken: string; let foreignToken: string;
   const auth = (token = ownerToken) => ({ authorization: `Bearer ${token}` });
   beforeAll(async () => {
@@ -17,11 +19,16 @@ describe('Home wall', () => {
     await app.register(async service => registerChallengeRoutes(service), { prefix: '/api/challenges' }); await app.ready(); await initializeChallengeTables();
     ownerToken = await signToken({ sub: owner, tenant_id: tenant, email: 'owner@example.com', name: 'Owner' });
     friendToken = await signToken({ sub: friend, tenant_id: tenant, email: 'friend@example.com', name: 'Friend' });
-    foreignToken = await signToken({ sub: friend, tenant_id: otherTenant, email: 'friend@example.com', name: 'Friend' });
+    foreignToken = await signToken({ sub: stranger, tenant_id: otherTenant, email: 'stranger@example.com', name: 'Stranger' });
   });
   beforeEach(async () => {
     for (const table of ['post_comments', 'post_likes', 'posts', 'participants', 'challenges']) await getPool().query(`DELETE FROM "challenges_test"."${table}"`);
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => new Response(JSON.stringify({ name: String(input).endsWith(owner) ? 'Owner Name' : 'Friend Name' }), { status: 200 }));
+    members = { [owner]: [tenant], [friend]: [tenant], [stranger]: [otherTenant] };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input); const communities = /\/internal\/users\/([0-9a-f-]+)\/communities$/.exec(url);
+      if (communities) return new Response(JSON.stringify((members[communities[1]!] ?? []).map(id => ({ id, name: id === tenant ? 'Alpha' : 'Beta', kind: 'community' }))), { status: 200 });
+      return new Response(JSON.stringify({ name: url.endsWith(owner) ? 'Owner Name' : 'Friend Name' }), { status: 200 });
+    });
   });
   afterEach(() => { vi.restoreAllMocks(); });
   afterAll(async () => { await app.close(); });
@@ -88,5 +95,41 @@ describe('Home wall', () => {
     expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/like`, headers: auth(foreignToken) })).statusCode).toBe(404);
     expect((await app.inject({ method: 'GET', url: `/api/challenges/wall/${id}/comments`, headers: auth(foreignToken) })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/comments`, headers: auth(foreignToken), payload: { body: 'hi' } })).statusCode).toBe(404);
+  });
+  it('merges posts of every community I belong to, filters by community, and excludes others', async () => {
+    await create('In Alpha');
+    const ownerBeta = await signToken({ sub: owner, tenant_id: otherTenant, email: 'owner@example.com', name: 'Owner' });
+    members[owner] = [tenant, otherTenant];
+    const beta = await app.inject({ method: 'POST', url: '/api/challenges', headers: auth(ownerBeta), payload: { title: 'In Beta', visibility: 'members', activity_category: 'fitness', start_date: '2026-11-01', end_date: '2026-12-31', target_count: 5 } });
+    expect(beta.statusCode, beta.body).toBe(201);
+    const merged = (await wall()).posts;
+    expect(merged.map(row => [row.challenge.title, row.community.name])).toEqual([['In Beta', 'Beta'], ['In Alpha', 'Alpha']]);
+    expect((await app.inject({ method: 'GET', url: `/api/challenges/wall?community_id=${tenant}`, headers: auth() })).json().posts).toHaveLength(1);
+    // The friend belongs to Alpha only: Beta posts never appear, and a members-only Beta post is hidden from a non-member filter.
+    expect((await wall(undefined, friendToken)).posts.map(row => row.challenge.title)).toEqual(['In Alpha']);
+    const filtered = await app.inject({ method: 'GET', url: `/api/challenges/wall?community_id=${otherTenant}`, headers: auth(friendToken) });
+    expect(filtered.json().posts).toEqual([]);
+  });
+  it('lets like and comment work from any member community, and answers 404 for a non-member', async () => {
+    const ownerBeta = await signToken({ sub: owner, tenant_id: otherTenant, email: 'owner@example.com', name: 'Owner' });
+    members[owner] = [tenant, otherTenant]; members[friend] = [tenant, otherTenant];
+    const made = await app.inject({ method: 'POST', url: '/api/challenges', headers: auth(ownerBeta), payload: { title: 'Elsewhere', activity_category: 'fitness', start_date: '2026-11-01', end_date: '2026-12-31', target_count: 5 } });
+    expect(made.statusCode, made.body).toBe(201);
+    const id = (await wall()).posts[0]!.id as string;
+    // friend's active community is Alpha, the post lives in Beta
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/like`, headers: auth(friendToken) })).json()).toEqual({ like_count: 1, liked_by_me: true });
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/comments`, headers: auth(friendToken), payload: { body: 'across' } })).statusCode).toBe(201);
+    const challengeId = (await wall(undefined, friendToken)).posts[0]!.challenge.id as string;
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/${challengeId}/join`, headers: auth(friendToken) })).statusCode).toBe(200);
+    members[friend] = [tenant];
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/like`, headers: auth(friendToken) })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: `/api/challenges/wall/${id}/comments`, headers: auth(friendToken), payload: { body: 'no' } })).statusCode).toBe(404);
+  });
+  it('creates a challenge in a chosen community and rejects one the user is not in', async () => {
+    const make = (communityId: string) => app.inject({ method: 'POST', url: '/api/challenges', headers: auth(), payload: { community_id: communityId, title: 'Chosen', activity_category: 'fitness', start_date: '2026-11-01', end_date: '2026-12-31', target_count: 5 } });
+    members[owner] = [tenant, otherTenant];
+    expect((await make(otherTenant)).json()).toMatchObject({ tenant_id: otherTenant });
+    members[owner] = [tenant];
+    expect((await make(otherTenant)).statusCode).toBe(403);
   });
 });

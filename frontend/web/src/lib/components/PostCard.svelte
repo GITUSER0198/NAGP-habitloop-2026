@@ -79,7 +79,8 @@
 <article class="card post">
   <header class="post-head">
     <span class="avatar post-avatar" aria-hidden="true">{initials(post.author_name)}</span>
-    <div class="post-who"><strong>{post.author_name}</strong><small class="muted">{relativeTime(post.created_at, now)}</small></div>
+    <div class="post-who"><strong>{post.author_name}</strong>
+      <small class="muted">{#if post.community.name}in <a href={`/communities/${post.community.id}`}>{post.community.name}</a> &middot; {/if}{relativeTime(post.created_at, now)}</small></div>
     <div class="chips">{#each values as value}<span class="pill tonal">{value}</span>{/each}</div>
   </header>
   {#if post.image_url && !imageFailed}
@@ -92,6 +93,9 @@
     <span>{post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}</span>
     <span>{post.participant_count} {post.participant_count === 1 ? 'participant' : 'participants'}</span>
   </p>
+  {#if !post.is_member}
+    <p class="post-actions"><a class="button outlined" href={`/communities/${post.community.id}`}>Join community to take part</a></p>
+  {:else}
   <div class="post-actions">
     <button type="button" class="outlined post-like" class:liked={post.liked_by_me} aria-pressed={post.liked_by_me} disabled={likeBusy} onclick={toggleLike}>
       <Icon name="heart" size={18} />{post.liked_by_me ? 'Liked' : 'Like'}
@@ -101,6 +105,7 @@
     {:else if post.joined_by_me}<span class="pill tonal"><Icon name="check" size={16} />Joined</span>
     {:else}<button type="button" disabled={joinBusy} onclick={join}>{joinBusy ? 'Joining...' : 'Join challenge'}</button>{/if}
   </div>
+  {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   <div class="post-comments">
     {#if post.comment_count > 2}
@@ -114,9 +119,9 @@
         <span class="comment-text"><strong>{comment.author_name}</strong> {comment.body} <small class="muted">{relativeTime(comment.created_at, now)}</small></span></p>
     {/each}
   </div>
-  <form class="comment-box" onsubmit={send}>
+  {#if post.is_member}<form class="comment-box" onsubmit={send}>
     <label class="sr-only" for={`comment-${post.id}`}>Write a comment on {post.challenge.title}</label>
     <input id={`comment-${post.id}`} bind:value={draft} placeholder="Write a comment..." maxlength="1000" autocomplete="off" disabled={commentBusy} />
     <button disabled={commentBusy || !draft.trim()}>{commentBusy ? 'Posting...' : 'Post'}</button>
-  </form>
+  </form>{/if}
 </article>

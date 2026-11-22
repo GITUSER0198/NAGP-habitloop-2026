@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { getConfig, getPool } from '@habitloop/shared';
 
 export async function initializeChallengeTables(): Promise<void> {
@@ -34,4 +35,11 @@ export async function initializeChallengeTables(): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now()
   )`);
   await pool.query(`CREATE INDEX IF NOT EXISTS "ix_post_comments_post" ON "${schema}"."post_comments" (post_id,created_at)`);
+  // Boot migration: challenges created before wall posts existed get one post, so every challenge shows in the feed.
+  const missing = await pool.query(`SELECT c.id, c.tenant_id, c.owner_id, c.description, c.start_date FROM "${schema}"."challenges" c
+    LEFT JOIN "${schema}"."posts" p ON p.challenge_id = c.id WHERE p.id IS NULL`);
+  for (const row of missing.rows as { id: string; tenant_id: string; owner_id: string; description: string; start_date: string }[]) {
+    await pool.query(`INSERT INTO "${schema}"."posts" (id, tenant_id, challenge_id, author_id, caption, created_at) VALUES ($1, $2, $3, $4, $5, $6::date) ON CONFLICT DO NOTHING`,
+      [randomUUID(), row.tenant_id, row.id, row.owner_id, row.description, row.start_date]);
+  }
 }

@@ -65,6 +65,9 @@ data class Summary(
 data class WallChallenge(val id: String = "", val title: String = "")
 
 @Serializable
+data class WallCommunity(val id: String = "", val name: String = "")
+
+@Serializable
 data class WallPost(
     val id: String,
     @SerialName("author_name") val authorName: String = "",
@@ -72,6 +75,7 @@ data class WallPost(
     @SerialName("image_url") val imageUrl: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val challenge: WallChallenge = WallChallenge(),
+    val community: WallCommunity = WallCommunity(),
     @SerialName("like_count") val likeCount: Int = 0,
     @SerialName("liked_by_me") val likedByMe: Boolean = false,
     @SerialName("comment_count") val commentCount: Int = 0,

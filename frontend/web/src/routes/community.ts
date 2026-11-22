@@ -2,7 +2,7 @@ import { formatTime } from '$lib/time';
 
 export interface Challenge {
   id: string; owner_id: string; title: string; description: string; visibility: string;
-  activity_category: string; start_date: string; end_date: string; target_count: number;
+  activity_category: string; start_date: string; end_date: string; target_count: number; tenant_id?: string;
 }
 export interface Provider { provider: string; activity_types: string[] }
 export interface PartnerLink {

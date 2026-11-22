@@ -39,7 +39,7 @@
         <article class="card community-card" class:is-active={item.active}>
           <div class="card-head">
             <span class="icon-tile"><Icon name="users" /></span>
-            <h3>{item.name}</h3>
+            <h3><a href={`/communities/${item.id}`}>{item.name}</a></h3>
             {#if item.active}<span class="pill tonal">Active</span>{/if}
           </div>
           {#if item.description}<p class="muted">{item.description}</p>{/if}
@@ -79,7 +79,7 @@
     <div class="community-grid">
       {#each data.discover as item (item.id)}
         <article class="card community-card">
-          <div class="card-head"><span class="icon-tile"><Icon name="users" /></span><h3>{item.name}</h3></div>
+          <div class="card-head"><span class="icon-tile"><Icon name="users" /></span><h3><a href={`/communities/${item.id}`}>{item.name}</a></h3></div>
           {#if item.description}<p class="muted">{item.description}</p>{/if}
           <p class="chips"><span class="pill">{members(item.member_count)}</span></p>
           {#if data.publicChallenges[item.id]?.length}

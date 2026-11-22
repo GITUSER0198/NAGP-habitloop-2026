@@ -219,7 +219,7 @@ fun HomeScreen(api: HabitApi) {
     }
     LaunchedEffect(Unit) { reload() }
     Column(Modifier.fillMaxSize().semantics { contentDescription = "home-wall" }) {
-        Text("Home wall", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
+        Text("All my communities", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(16.dp))
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 16.dp)) }
         if (loaded && posts.isEmpty() && error == null) Text("No posts yet in this community.", Modifier.padding(16.dp))
         LazyColumn(contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -227,7 +227,7 @@ fun HomeScreen(api: HabitApi) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(12.dp)) {
                         Text(p.challenge.title, style = MaterialTheme.typography.titleMedium)
-                        Text("by ${p.authorName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (p.community.name.isEmpty()) "by ${p.authorName}" else "by ${p.authorName} in ${p.community.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         p.imageUrl?.let { url -> if (url.startsWith("/")) BuildConfig.WEB_BASE_URL.trimEnd('/') + url else url }?.let { RemoteImage(it, Modifier.fillMaxWidth().height(160.dp).padding(vertical = 8.dp)) }
                         Text(p.caption)
                         Row(verticalAlignment = Alignment.CenterVertically) {

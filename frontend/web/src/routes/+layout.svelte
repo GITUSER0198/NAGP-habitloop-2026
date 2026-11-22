@@ -76,7 +76,7 @@
         {#each nav as item}
           {@const exact = page.url.pathname === item.href}
           {@const section = !exact && item.href !== '/activities/new' && page.url.pathname.startsWith(`${item.href}/`)}
-          <a class="nav-link" href={item.href} title={item.label} aria-current={exact ? 'page' : section ? 'true' : undefined} onclick={() => menuOpen = false}>
+          <a class="nav-link" href={item.href} title={item.label} aria-label={item.label} aria-current={exact ? 'page' : section ? 'true' : undefined} onclick={() => menuOpen = false}>
             <Icon name={item.icon} />
             <span class="nav-label">{item.label}</span>
             {#if item.feature === 'recommendations' && community.recommendations}
