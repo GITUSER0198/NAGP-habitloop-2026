@@ -100,20 +100,20 @@ interface PlanItem { api: API; name: string; category: string; hour: number; day
 const CHALLENGES_COMMUNITY = 'Nagarro Challenges';
 const CHALLENGES_DESCRIPTION = 'Small daily habits we take on together at Nagarro.';
 // Joiners, likers and commenters are test user numbers (1 to 3).
-const CHALLENGE_POSTS: { title: string; slug: string; category: string; values: string; caption: string; joiners: number[]; likers: number[]; comments: [number, string][] }[] = [
-  { title: 'Code Every Day', slug: 'code-every-day', category: 'learning', values: 'Intelligent', joiners: [3], likers: [1],
+const CHALLENGE_POSTS: { title: string; slug: string; category: string; caption: string; joiners: number[]; likers: number[]; comments: [number, string][] }[] = [
+  { title: 'Code Every Day', slug: 'code-every-day', category: 'learning', joiners: [3], likers: [1],
     caption: 'Write or read code for at least 20 minutes a day. Small steady practice beats weekend cramming.',
     comments: [[1, 'Working through a small Rust exercise each day.']] },
-  { title: 'Cycle to Work', slug: 'cycle-to-work', category: 'fitness', values: 'Responsible, Global', joiners: [1, 2], likers: [1, 2, 3],
+  { title: 'Cycle to Work', slug: 'cycle-to-work', category: 'fitness', joiners: [1, 2], likers: [1, 2, 3],
     caption: 'Swap one commute a day for a bike ride. Fewer emissions, more energy, and a better start to the working day.',
     comments: [[1, 'Day 3 done, the route along the canal is lovely.'], [2, 'Joined! Borrowing a bike this week.']] },
-  { title: 'Meditation Streak', slug: 'meditation-streak', category: 'mind', values: 'Client-centric', joiners: [1, 3], likers: [1, 3],
+  { title: 'Meditation Streak', slug: 'meditation-streak', category: 'mind', joiners: [1, 3], likers: [1, 3],
     caption: 'Ten quiet minutes every morning. A calmer head makes for better conversations with clients.',
     comments: [[3, 'Ten minutes before standup works well for me.']] },
-  { title: 'Sleep by 11', slug: 'sleep-by-11', category: 'health', values: 'Responsible', joiners: [2], likers: [2, 3],
+  { title: 'Sleep by 11', slug: 'sleep-by-11', category: 'health', joiners: [2], likers: [2, 3],
     caption: 'Lights out by 11 PM. Rested people make better decisions and look after their health.',
     comments: [[2, 'Screens off at 10:30 PM is the trick.'], [3, 'Streak of 5 nights so far.'], [1, 'Trying this from tonight.']] },
-  { title: 'Stairs Not Lifts', slug: 'stairs-not-lifts', category: 'fitness', values: 'Agile', joiners: [1, 2, 3], likers: [2],
+  { title: 'Stairs Not Lifts', slug: 'stairs-not-lifts', category: 'fitness', joiners: [1, 2, 3], likers: [2],
     caption: 'Take the stairs whenever it is five floors or fewer. Quick, free, and everyone can join in.',
     comments: [[2, 'Seventh floor counts, right?'], [1, 'Legs are feeling it already.']] }
 ];
@@ -144,7 +144,7 @@ async function seedChallenges(baseUrl: string, password: string): Promise<void> 
       challenge = await dhruv.call('POST', '/api/challenges', {
         title: item.title, description: item.caption, visibility: 'public', activity_category: item.category,
         start_date: isoDate(new Date(itemStart)), end_date: isoDate(new Date(itemStart + length * DAY_MS)), target_count: 30,
-        image_url: `/posts/${item.slug}.jpg`, caring_value: item.values
+        image_url: `/posts/${item.slug}.jpg`
       });
     }
     if (String(challenge?.end_date).slice(0, 10) < isoDate(new Date())) continue;

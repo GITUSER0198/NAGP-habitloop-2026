@@ -42,11 +42,11 @@ describe('Home wall', () => {
   }
   async function firstPostId(): Promise<string> { return (await wall()).posts[0]!.id as string; }
 
-  it('lists newest first with author name, image and value chip, and pages by 10', async () => {
+  it('lists newest first with optional legacy value metadata, and pages by 10', async () => {
     await create('First', 'public', { image_url: '/posts/a.jpg', caring_value: 'Responsible' });
     for (let i = 2; i <= 12; i++) { await new Promise(resolve => setTimeout(resolve, 3)); await create(`Post ${i}`); }
     const first = await wall();
-    expect(first.posts).toHaveLength(10); expect(first.posts[0]).toMatchObject({ caption: 'About Post 12', author_name: 'Owner Name', participant_count: 1, joined_by_me: true });
+    expect(first.posts).toHaveLength(10); expect(first.posts[0]).toMatchObject({ caption: 'About Post 12', author_name: 'Owner Name', participant_count: 1, joined_by_me: true, caring_value: null });
     expect(first.next_cursor).toBeTruthy();
     const second = await wall(first.next_cursor!);
     expect(second.posts.map(row => row.challenge.title)).toEqual(['Post 2', 'First']);

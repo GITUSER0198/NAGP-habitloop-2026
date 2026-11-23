@@ -3,7 +3,6 @@
   import type { PageProps } from './$types';
   import { features } from '$lib/config/features';
   import { app } from '$lib/config/app';
-  import { CHALLENGE_VALUES } from '$lib/wall';
   import Busy from '$lib/components/Busy.svelte';
   let { data, form }: PageProps = $props();
   let busy = $state(false);
@@ -25,8 +24,6 @@
         {#each Object.keys(data.categories) as category}<option value={category}>{category}</option>{/each}
       </select>
     {:else}<input type="hidden" name="activity_category" value="other" />{/if}
-    <label for="value">Value (optional)</label>
-    <select id="value" name="caring_value"><option value="">None</option>{#each CHALLENGE_VALUES as value}<option value={value}>{value}</option>{/each}</select>
     <label for="start">Start date</label><input id="start" name="start_date" type="date" required />
     <label for="end">End date</label><input id="end" name="end_date" type="date" required />
     <label for="target">Target count</label><input id="target" name="target_count" type="number" min="1" step="1" value="7" required />

@@ -155,9 +155,10 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
     expect((await patch({ walk: activity })).statusCode).toBe(502);
   });
-  it('scopes mapping and stats to both owner and tenant, including deleted links', async () => {
+  it('scopes mapping and stats to the owner in any community, including deleted links', async () => {
     const link = (await create()).json();
-    for (const [sub, tenant_id] of [['44444444-4444-4444-8444-444444444444', tenant], [user, otherTenant]]) {
+    // A wearable belongs to its owner across communities; only other users are refused.
+    for (const [sub, tenant_id] of [['44444444-4444-4444-8444-444444444444', tenant], ['44444444-4444-4444-8444-444444444444', otherTenant]]) {
       const outsider = await signToken({ sub, tenant_id, email: 'other@example.com', name: 'Other' });
       expect((await app.inject({ method: 'PATCH', url: `/api/integrations/links/${link.id}`, headers: auth(outsider), payload: { activity_map: {} } })).statusCode).toBe(404);
       expect((await app.inject({ url: `/api/integrations/links/${link.id}/stats`, headers: auth(outsider) })).statusCode).toBe(404);

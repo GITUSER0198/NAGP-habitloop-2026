@@ -193,7 +193,6 @@ private fun PostCard(api: HabitApi, post: WallPost, onOpen: () -> Unit, onChange
                 post.imageUrl?.let { RemoteImage(it, Modifier.fillMaxWidth().height(160.dp)) }
                 if (post.caption.isNotBlank()) Text(post.caption)
             }
-            post.caringValue?.let { SuggestionChip(onClick = onOpen, label = { Text(it) }) }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(enabled = !busy, onClick = {
                     busy = true
@@ -279,7 +278,6 @@ private fun ChallengeScreen(api: HabitApi, post: WallPost, onBack: () -> Unit) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { refresh++ }, enabled = !busy) { Text("Retry") } }
             Text(challenge.description.ifBlank { post.caption.ifBlank { "No description provided." } })
             Text("${challenge.startDate} to ${challenge.endDate}")
-            post.caringValue?.let { SuggestionChip(onClick = {}, label = { Text(it) }) }
             Text("Visibility: ${challenge.visibility}")
             Text("Participants: ${post.participantCount + if (joined && !post.joinedByMe) 1 else 0}")
             Text("Target: ${challenge.targetCount}")

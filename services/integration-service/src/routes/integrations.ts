@@ -97,11 +97,12 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
   });
   app.get('/links', { onRequest: requireUser }, async request => getDb().select({ id: links.id, tenant_id: links.tenant_id, user_id: links.user_id,
     provider: links.provider, status: links.status, activity_map: links.activity_map, created_at: links.created_at }).from(links)
-    .where(and(eq(links.tenant_id, id(request).tenantId), eq(links.user_id, id(request).userId), eq(links.status, 'active'))).orderBy(desc(links.created_at), desc(links.id)));
+    // A wearable belongs to the person, not to one community: list the caller's links in every community.
+    .where(and(eq(links.user_id, id(request).userId), eq(links.status, 'active'))).orderBy(desc(links.created_at), desc(links.id)));
   async function owned(request: FastifyRequest) {
     const user = id(request);
     const row = (await getDb().select().from(links).where(and(eq(links.id, (request.params as { id: string }).id),
-      eq(links.tenant_id, user.tenantId), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1))[0];
+      eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1))[0];
     if (!row) fail(404, 'Link not found');
     return row;
   }
@@ -143,7 +144,7 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
     const [events, logs, counts] = await Promise.all([
       getDb().select().from(partnerEvents).where(and(scope, gte(partnerEvents.received_at, new Date(since))))
         .orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)),
-      read<WearableLog[]>(`${process.env.ACTIVITY_SERVICE_URL ?? 'http://activity-service:47820'}/api/activities/internal/users/${link.user_id}/logs?since=${encodeURIComponent(since)}`),
+      read<WearableLog[]>(`${process.env.ACTIVITY_SERVICE_URL ?? 'http://activity-service:47820'}/api/activities/internal/users/${link.user_id}/logs?since=${encodeURIComponent(since)}&tenant_id=${link.tenant_id}`),
       getDb().select({ status: partnerEvents.status, total: count(), last: max(partnerEvents.received_at) }).from(partnerEvents)
         .where(scope).groupBy(partnerEvents.status)
     ]);
@@ -161,9 +162,9 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
   });
   app.get('/links/:id/events', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async request => {
     const user = id(request); const linkId = (request.params as { id: string }).id;
-    const owned = await getDb().select({ id: links.id }).from(links).where(and(eq(links.id, linkId), eq(links.tenant_id, user.tenantId), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1);
+    const owned = await getDb().select({ id: links.id, tenant_id: links.tenant_id }).from(links).where(and(eq(links.id, linkId), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1);
     if (!owned.length) fail(404, 'Link not found');
-    return getDb().select().from(partnerEvents).where(and(eq(partnerEvents.link_id, linkId), eq(partnerEvents.tenant_id, user.tenantId))).orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)).limit(50);
+    return getDb().select().from(partnerEvents).where(and(eq(partnerEvents.link_id, linkId), eq(partnerEvents.tenant_id, owned[0]!.tenant_id))).orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)).limit(50);
   });
   app.post('/ingest/:link_id', { schema: { params: Type.Object({ link_id: Uuid }) } }, async (request, reply) => {
     const linkId = (request.params as { link_id: string }).link_id;

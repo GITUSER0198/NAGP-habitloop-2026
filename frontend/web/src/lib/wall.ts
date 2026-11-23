@@ -8,5 +8,3 @@ export interface WallPost {
   participant_count: number; joined_by_me: boolean; owned_by_me: boolean;
 }
 export interface WallPage { posts: WallPost[]; next_cursor: string | null }
-// Optional per-challenge value chip shown on the wall and chosen when creating a challenge.
-export const CHALLENGE_VALUES = ['Agile', 'Responsible', 'Intelligent', 'Client-centric', 'Global'] as const;

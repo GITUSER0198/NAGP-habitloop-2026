@@ -19,7 +19,6 @@
   let expanded = $state(false);
 
   const initials = (name: string): string => name.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('') || '?';
-  const values = $derived((post.caring_value ?? '').split(',').map(value => value.trim()).filter(Boolean));
   const shown = $derived(expanded && all ? all : [...post.latest_comments].reverse());
 
   async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -81,7 +80,6 @@
     <span class="avatar post-avatar" aria-hidden="true">{initials(post.author_name)}</span>
     <div class="post-who"><strong>{post.author_name}</strong>
       <small class="muted">{#if post.community.name}in <a href={`/communities/${post.community.id}`}>{post.community.name}</a> &middot; {/if}{relativeTime(post.created_at, now)}</small></div>
-    <div class="chips">{#each values as value}<span class="pill tonal">{value}</span>{/each}</div>
   </header>
   {#if post.image_url && !imageFailed}
     <img class="post-photo" src={post.image_url} alt={`${post.challenge.title} challenge`} loading="lazy" decoding="async" width="1600" height="900" onerror={() => { imageFailed = true; }} />

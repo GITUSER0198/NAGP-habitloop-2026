@@ -149,9 +149,9 @@ export async function registerActivityRoutes(app: FastifyInstance): Promise<void
       throw error;
     }
   });
-  app.get('/internal/users/:uid/logs', { onRequest: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ uid: Uuid }), querystring: Type.Object({ since: Type.String({ format: 'date-time' }) }) } }, async request => {
+  app.get('/internal/users/:uid/logs', { onRequest: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ uid: Uuid }), querystring: Type.Object({ tenant_id: Type.Optional(Type.String({ format: 'uuid' })), since: Type.String({ format: 'date-time' }) }) } }, async request => {
     const { uid } = request.params as { uid: string }; const { since } = request.query as { since: string };
-    return getDb().select().from(activityLogs).where(and(eq(activityLogs.tenant_id, request.user!.tenantId), eq(activityLogs.user_id, uid), gte(activityLogs.logged_at, bounds(since)))).orderBy(asc(activityLogs.logged_at), asc(activityLogs.id));
+    return getDb().select().from(activityLogs).where(and(eq(activityLogs.tenant_id, (request.query as { tenant_id?: string }).tenant_id ?? request.user!.tenantId), eq(activityLogs.user_id, uid), gte(activityLogs.logged_at, bounds(since)))).orderBy(asc(activityLogs.logged_at), asc(activityLogs.id));
   });
   app.patch('/internal/:id/schedule', { onRequest: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ id: Uuid }), body: Schedule } }, async request => {
     const { id } = request.params as { id: string }; const current = await owned(id, identity(request)); if (!current.active) fail(409, 'Activity is no longer active');
