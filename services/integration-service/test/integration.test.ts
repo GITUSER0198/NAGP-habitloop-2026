@@ -134,6 +134,60 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     expect((await app.inject({ url: '/docs' })).statusCode).toBe(200); expect((await app.inject({ url: '/api/integrations/docs' })).statusCode).toBe(200);
     expect((await app.inject({ url: '/api/integrations/openapi.json' })).statusCode).toBe(200);
   });
+  it('updates mappings with nullable types and never exposes ingest credentials', async () => {
+    const link = (await create('galaxywatch')).json();
+    const response = await app.inject({ method: 'PATCH', url: `/api/integrations/links/${link.id}`, headers: auth(),
+      payload: { activity_map: { walk: activity.toUpperCase(), run: null } } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().activity_map).toEqual({ walk: activity, run: null });
+    expect(response.json()).not.toHaveProperty('ingest_key');
+    expect(response.json()).not.toHaveProperty('ingest_key_hash');
+    expect((await app.inject({ url: '/api/integrations/links', headers: auth() })).json()[0].activity_map).toEqual({ walk: activity, run: null });
+  });
+  it('rejects unknown mapping types and foreign activities without changing the map', async () => {
+    const link = (await create()).json();
+    const patch = (activity_map: Record<string, string | null>) => app.inject({ method: 'PATCH',
+      url: `/api/integrations/links/${link.id}`, headers: auth(), payload: { activity_map } });
+    expect((await patch({ yoga: activity })).statusCode).toBe(422);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 404 }));
+    expect((await patch({ walk: activity })).statusCode).toBe(422);
+    expect((await app.inject({ url: '/api/integrations/links', headers: auth() })).json()[0].activity_map).toEqual({ run: activity });
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('offline'));
+    expect((await patch({ walk: activity })).statusCode).toBe(502);
+  });
+  it('scopes mapping and stats to both owner and tenant, including deleted links', async () => {
+    const link = (await create()).json();
+    for (const [sub, tenant_id] of [['44444444-4444-4444-8444-444444444444', tenant], [user, otherTenant]]) {
+      const outsider = await signToken({ sub, tenant_id, email: 'other@example.com', name: 'Other' });
+      expect((await app.inject({ method: 'PATCH', url: `/api/integrations/links/${link.id}`, headers: auth(outsider), payload: { activity_map: {} } })).statusCode).toBe(404);
+      expect((await app.inject({ url: `/api/integrations/links/${link.id}/stats`, headers: auth(outsider) })).statusCode).toBe(404);
+    }
+    expect((await app.inject({ url: `/api/integrations/links/${link.id}/stats` })).statusCode).toBe(401);
+    await app.inject({ method: 'DELETE', url: `/api/integrations/links/${link.id}`, headers: auth() });
+    expect((await app.inject({ url: `/api/integrations/links/${link.id}/stats`, headers: auth() })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'PATCH', url: `/api/integrations/links/${link.id}`, headers: auth(), payload: { activity_map: {} } })).statusCode).toBe(404);
+  });
+  it('returns scoped watch stats, defaults to seven days and validates the range', async () => {
+    const link = (await create('galaxywatch')).json();
+    const started_at = new Date().toISOString();
+    const received = (await send(link, workout({ started_at, avg_heart_rate: 123 }))).json();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async url => new Response(JSON.stringify(String(url).includes('/api/users/') ? { timezone: 'Asia/Kolkata' } : [
+      { tenant_id: tenant, user_id: user, source: 'partner', source_event_id: received.id,
+        logged_at: started_at, duration_min: 25, metadata: { link_id: link.id } }
+    ]), { status: 200 }));
+    const path = `/api/integrations/links/${link.id}/stats`;
+    const response = await app.inject({ url: path, headers: auth() });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().daily).toHaveLength(7);
+    expect(response.json()).toMatchObject({ timezone: 'Asia/Kolkata', latest_heart_rate: 123,
+      today: { steps: 5500, workouts: 1, active_minutes: 25 }, pipeline: { received: 1, normalized: 0, rejected: 0 } });
+    expect(response.json().workouts[0].status).toBe('Logged');
+    expect(response.json()).not.toHaveProperty('ingest_key_hash');
+    expect((await app.inject({ url: `${path}?days=31`, headers: auth() })).json().daily).toHaveLength(31);
+    for (const days of ['0', '32', '-1', '1.5', 'bad']) expect((await app.inject({ url: `${path}?days=${days}`, headers: auth() })).statusCode).toBe(422);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('', { status: 503 }));
+    expect((await app.inject({ url: path, headers: auth() })).statusCode).toBe(502);
+  });
   it('matches complete provider, link, accepted event, event list, and PATCH JSON shapes', async () => {
     const providers = await app.inject({ url: '/api/integrations/providers', headers: auth() });
     expect(providers.statusCode).toBe(200);

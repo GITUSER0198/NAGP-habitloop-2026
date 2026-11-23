@@ -1,8 +1,9 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { and, desc, eq } from 'drizzle-orm';
-import { getDb, invalidInput, publish, requireInternal, requireUser, type UserClaims } from '@habitloop/shared';
+import { and, count, desc, eq, gte, max } from 'drizzle-orm';
+import { getConfig, getDb, invalidInput, publish, requireInternal, requireUser, type UserClaims } from '@habitloop/shared';
+import { wearableStats, type WearableLog } from '../stats.js';
 import { links, partnerEvents } from '../db/schema.js';
 
 const Uuid = Type.String({ format: 'uuid' });
@@ -26,7 +27,7 @@ const LinkBody = Type.Object({
 }, { additionalProperties: false });
 function id(request: FastifyRequest): UserClaims { return request.user!; }
 function fail(statusCode: number, message: string): never { throw Object.assign(new Error(message), { statusCode }); }
-function validMap(provider: string, map: Record<string, string>): boolean {
+function validMap(provider: string, map: Record<string, string | null>): boolean {
   const allowed = providers.find(item => item.provider === provider)?.activity_types ?? [];
   return Object.keys(map).every(activity => allowed.includes(activity));
 }
@@ -97,6 +98,62 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
   app.get('/links', { onRequest: requireUser }, async request => getDb().select({ id: links.id, tenant_id: links.tenant_id, user_id: links.user_id,
     provider: links.provider, status: links.status, activity_map: links.activity_map, created_at: links.created_at }).from(links)
     .where(and(eq(links.tenant_id, id(request).tenantId), eq(links.user_id, id(request).userId), eq(links.status, 'active'))).orderBy(desc(links.created_at), desc(links.id)));
+  async function owned(request: FastifyRequest) {
+    const user = id(request);
+    const row = (await getDb().select().from(links).where(and(eq(links.id, (request.params as { id: string }).id),
+      eq(links.tenant_id, user.tenantId), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1))[0];
+    if (!row) fail(404, 'Link not found');
+    return row;
+  }
+  app.patch('/links/:id', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }),
+    body: Type.Object({ activity_map: Type.Record(Type.String(), Type.Union([Uuid, Type.Null()])) }, { additionalProperties: false }) } }, async request => {
+    const link = await owned(request);
+    const map = (request.body as { activity_map: Record<string, string | null> }).activity_map;
+    if (!validMap(link.provider, map)) fail(422, 'Map only activity types supported by this provider');
+    for (const activityId of new Set(Object.values(map).filter((value): value is string => value !== null))) {
+      const response = await fetch(`${process.env.ACTIVITY_SERVICE_URL ?? 'http://activity-service:47820'}/api/activities/${activityId}`, {
+        headers: { authorization: request.headers.authorization ?? '' }, signal: AbortSignal.timeout(5000)
+      }).catch(() => undefined);
+      if (response?.status === 404) fail(422, 'Mapped activity not found');
+      if (!response?.ok) fail(502, 'Mapped activities could not be validated');
+    }
+    const activity_map = Object.fromEntries(Object.entries(map).map(([key, value]) => [key, value?.toLowerCase() ?? null]));
+    const row = (await getDb().update(links).set({ activity_map }).where(and(eq(links.id, link.id),
+      eq(links.tenant_id, link.tenant_id), eq(links.user_id, link.user_id), eq(links.status, 'active')))
+      .returning({ id: links.id, tenant_id: links.tenant_id, user_id: links.user_id, provider: links.provider,
+        status: links.status, activity_map: links.activity_map, created_at: links.created_at }))[0];
+    if (!row) fail(404, 'Link not found');
+    return row;
+  });
+  app.get('/links/:id/stats', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }),
+    querystring: Type.Object({ days: Type.Optional(Type.String({ pattern: '^(?:[1-9]|[12][0-9]|3[01])$', default: '7' })) }) } }, async request => {
+    const link = await owned(request);
+    const headers = { authorization: request.headers.authorization ?? '', 'x-internal-token': getConfig().internalToken };
+    async function read<T>(url: string): Promise<T> {
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(5000) }).catch(() => undefined);
+      if (!response?.ok) fail(502, 'Wearable stats could not be loaded');
+      return response.json() as Promise<T>;
+    }
+    const user = await read<{ timezone: string }>(`${process.env.USER_SERVICE_URL ?? 'http://user-service:47820'}/api/users/internal/users/${link.user_id}`);
+    const days = Number((request.query as { days?: string }).days ?? '7');
+    const now = new Date();
+    // Include an extra UTC day so every local date in the requested window is covered.
+    const since = new Date(now.getTime() - (days + 1) * 86400000).toISOString();
+    const scope = and(eq(partnerEvents.link_id, link.id), eq(partnerEvents.tenant_id, link.tenant_id));
+    const [events, logs, counts] = await Promise.all([
+      getDb().select().from(partnerEvents).where(and(scope, gte(partnerEvents.received_at, new Date(since))))
+        .orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)),
+      read<WearableLog[]>(`${process.env.ACTIVITY_SERVICE_URL ?? 'http://activity-service:47820'}/api/activities/internal/users/${link.user_id}/logs?since=${encodeURIComponent(since)}`),
+      getDb().select({ status: partnerEvents.status, total: count(), last: max(partnerEvents.received_at) }).from(partnerEvents)
+        .where(scope).groupBy(partnerEvents.status)
+    ]);
+    const stats = wearableStats(link, events, logs, days, user.timezone, now);
+    return { ...stats, pipeline: { received: counts.reduce((total, row) => total + row.total, 0),
+      normalized: counts.find(row => row.status === 'normalized')?.total ?? 0,
+      rejected: counts.find(row => row.status === 'rejected')?.total ?? 0 },
+      last_sync_at: counts.map(row => row.last).filter((value): value is Date => value !== null)
+        .map(value => new Date(value).toISOString()).sort().at(-1) ?? null };
+  });
   app.delete('/links/:id', { onRequest: requireUser, schema: { params: Type.Object({ id: Uuid }) } }, async (request, reply) => {
     const user = id(request); const linkId = (request.params as { id: string }).id;
     const rows = await getDb().update(links).set({ status: 'deleted' }).where(and(eq(links.id, linkId), eq(links.tenant_id, user.tenantId), eq(links.user_id, user.userId), eq(links.status, 'active'))).returning({ id: links.id });

@@ -3,20 +3,35 @@ import type { Activity } from '$lib/types';
 import { api, apiResponse, ApiError, pageError } from '$lib/server/api';
 import type { LinkSecret, PartnerEvent, PartnerLink, Provider } from '../community';
 import { actionFailure, field, post, requireFeature, resourceId } from '../community.server';
+import type { WearableStats } from './types';
 
 export const load: PageServerLoad = async (event) => {
   requireFeature('integrations');
+  event.depends('wearable:stats');
   try {
     const [providers, links, activities] = await Promise.all([
       api<Provider[]>(event, '/api/integrations/providers'), api<PartnerLink[]>(event, '/api/integrations/links'),
       api<Activity[]>(event, '/api/activities')
     ]);
-    const events = (await Promise.all(links.map(link => api<PartnerEvent[]>(event, `/api/integrations/links/${link.id}/events`))))
+    const events = (await Promise.all(links.filter(link => link.provider !== 'galaxywatch').map(link => api<PartnerEvent[]>(event, `/api/integrations/links/${link.id}/events`))))
       .flat().sort((a, b) => b.received_at.localeCompare(a.received_at)).slice(0, 50);
-    return { providers, links, activities: activities.filter(activity => activity.active), events };
+    const stats = Object.fromEntries(await Promise.all(links.filter(link => link.provider === 'galaxywatch').map(async link =>
+      [link.id, await api<WearableStats>(event, `/api/integrations/links/${link.id}/stats?days=7`)] as const)));
+    return { providers, links, activities: activities.filter(activity => activity.active), events, stats, updatedAt: Date.now() };
   } catch (cause) { pageError(cause); }
 };
 export const actions: Actions = {
+  mapping: async (event) => {
+    requireFeature('integrations');
+    try {
+      const data = await event.request.formData();
+      const id = resourceId(field(data, 'id'));
+      const activity_map: Record<string, string | null> = {};
+      for (const [key, value] of data) if (key.startsWith('map:')) activity_map[key.slice(4)] = String(value) ? resourceId(String(value)) : null;
+      await api(event, `/api/integrations/links/${id}`, { method: 'PATCH', body: JSON.stringify({ activity_map }) });
+      return { message: 'Activity mapping saved.' };
+    } catch (cause) { return actionFailure(cause); }
+  },
   link: async (event) => {
     requireFeature('integrations');
     try {
