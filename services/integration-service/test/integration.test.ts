@@ -323,4 +323,53 @@ describe('Integration Service HTTP contract parity (22 Python cases)', () => {
     expect(events[0].payload.started_at).toBe(expected);
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls.at(-1)![1]?.body)).detail.raw.started_at).toBe(expected);
   });
+
+  describe('delete a workout', () => {
+    async function ingested() {
+      const link = (await create()).json(); await send(link);
+      const eventId = (await getPool().query('SELECT id FROM "integrations_test".partner_events')).rows[0].id as string;
+      return { link, eventId };
+    }
+    const del = (linkId: string, eventId: string, headers = auth()) => app.inject({ method: 'DELETE', url: `/api/integrations/links/${linkId}/events/${eventId}`, headers });
+    const status = async () => (await getPool().query('SELECT status FROM "integrations_test".partner_events')).rows[0].status as string;
+    it('marks the event deleted, calls the activity service, and hides it from lists and stats', async () => {
+      const { link, eventId } = await ingested();
+      const fetchMock = vi.mocked(fetch); fetchMock.mockClear();
+      expect((await del(link.id, eventId)).statusCode).toBe(204);
+      const call = fetchMock.mock.calls.find(item => String(item[0]).includes('/internal/logs/by-source/'))!;
+      expect(String(call[0])).toContain(`/api/activities/internal/logs/by-source/${eventId}?tenant_id=${tenant}`);
+      expect(call[1]).toMatchObject({ method: 'DELETE', headers: { 'x-internal-token': process.env.INTERNAL_TOKEN } });
+      expect(await status()).toBe('deleted');
+      expect((await app.inject({ url: `/api/integrations/links/${link.id}/events`, headers: auth() })).json()).toEqual([]);
+      fetchMock.mockImplementation(async url => String(url).includes('/api/users/') ? new Response(JSON.stringify({ timezone: 'UTC' }), { status: 200 }) : new Response('[]', { status: 200 }));
+      const stats = (await app.inject({ url: `/api/integrations/links/${link.id}/stats?days=31`, headers: auth() })).json();
+      expect(stats.pipeline.received).toBe(0); expect(stats.workouts).toEqual([]);
+      expect((await del(link.id, eventId)).statusCode).toBe(404);
+    });
+    it('treats a missing activity log as success and fails with 502 on other errors', async () => {
+      const { link, eventId } = await ingested();
+      vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 500 }));
+      expect((await del(link.id, eventId)).statusCode).toBe(502);
+      expect(await status()).toBe('received');
+      vi.mocked(fetch).mockResolvedValue(new Response('{}', { status: 404 }));
+      expect((await del(link.id, eventId)).statusCode).toBe(204);
+    });
+    it('lets the link owner delete from another community but nobody else', async () => {
+      const { link, eventId } = await ingested();
+      const other = await signToken({ sub: '44444444-4444-4444-8444-444444444444', tenant_id: tenant, email: 'o@example.com', name: 'Other' });
+      expect((await del(link.id, eventId, auth(other))).statusCode).toBe(404);
+      expect(await status()).toBe('received');
+      expect((await del(link.id, '99999999-9999-4999-8999-999999999999')).statusCode).toBe(404);
+      const crossCommunity = await signToken({ sub: user, tenant_id: otherTenant, email: 'test@example.com', name: 'Tester' });
+      expect((await del(link.id, eventId, auth(crossCommunity))).statusCode).toBe(204);
+      const call = vi.mocked(fetch).mock.calls.find(item => String(item[0]).includes('/internal/logs/by-source/'))!;
+      expect(String(call[0])).toContain(`tenant_id=${tenant}`);
+    });
+    it('keeps an event deleted when the normalizer reports late', async () => {
+      const { link, eventId } = await ingested(); await del(link.id, eventId);
+      const response = await app.inject({ method: 'PATCH', url: `/api/integrations/internal/events/${eventId}`, headers: { ...auth(), 'x-internal-token': process.env.INTERNAL_TOKEN! }, payload: { status: 'normalized' } });
+      expect(response.statusCode).toBe(200);
+      expect(await status()).toBe('deleted');
+    });
+  });
 });

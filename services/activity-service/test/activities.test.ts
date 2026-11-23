@@ -76,4 +76,25 @@ describe('Activity Service HTTP contract', () => {
       expect((await getPool().query('SELECT id FROM "activities_test"."activity_logs"')).rows).toHaveLength(1);
     } finally { fetch.mockRestore(); }
   });
+  it('deletes a partner log by source event, publishes ActivityLogDeleted once, and is tenant-scoped', async () => {
+    const id = (await create()).json().id; const internal = { 'x-internal-token': process.env.INTERNAL_TOKEN! };
+    const challenge = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => String(input).includes('/active') ? new Response(JSON.stringify([challenge]), { status: 200 }) : new Response(null, { status: 202 }));
+    try {
+      const payload = { tenant_id: tenant, user_id: user, activity_id: id, status: 'done', logged_at: '2026-11-21T08:00:00Z', source: 'partner', source_event_id: 'evt-del', metadata: {} };
+      const created = await app.inject({ method: 'POST', url: '/api/activities/internal/logs', headers: { ...auth(), ...internal }, payload });
+      const logId = created.json().id;
+      expect((await app.inject({ method: 'DELETE', url: `/api/activities/internal/logs/by-source/evt-del?tenant_id=${tenant}` })).statusCode).toBe(401);
+      expect((await app.inject({ method: 'DELETE', url: `/api/activities/internal/logs/by-source/evt-del?tenant_id=${otherTenant}`, headers: internal })).statusCode).toBe(404);
+      expect((await getPool().query('SELECT id FROM "activities_test"."activity_logs"')).rows).toHaveLength(1);
+      const removed = await app.inject({ method: 'DELETE', url: `/api/activities/internal/logs/by-source/evt-del?tenant_id=${tenant}`, headers: internal });
+      expect(removed.statusCode).toBe(204);
+      expect((await getPool().query('SELECT id FROM "activities_test"."activity_logs"')).rows).toHaveLength(0);
+      const deletedEvents = fetch.mock.calls.filter(call => String(call[1]?.body ?? '').includes('ActivityLogDeleted'));
+      expect(deletedEvents).toHaveLength(1);
+      expect(JSON.parse(deletedEvents[0]![1]!.body as string).detail).toEqual({ tenant_id: tenant, user_id: user, activity_id: id, log_id: logId, status: 'done',
+        logged_at: '2026-11-21T08:00:00+00:00', challenge_ids: [challenge] });
+      expect((await app.inject({ method: 'DELETE', url: `/api/activities/internal/logs/by-source/evt-del?tenant_id=${tenant}`, headers: internal })).statusCode).toBe(404);
+    } finally { fetch.mockRestore(); }
+  });
 });

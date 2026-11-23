@@ -103,6 +103,10 @@ class HabitApi(
     suspend fun events(linkId: String): List<PartnerEvent> =
         HabitJson.decodeFromString(ListSerializer(PartnerEvent.serializer()), check(call("GET", "/api/integrations/links/$linkId/events")))
 
+    suspend fun deleteWorkout(linkId: String, partnerEventId: String) {
+        check(call("DELETE", "/api/integrations/links/$linkId/events/$partnerEventId"))
+    }
+
     suspend fun communities(): List<MyCommunity> =
         HabitJson.decodeFromString(ListSerializer(MyCommunity.serializer()), check(call("GET", "/api/users/communities")))
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { aggregate, handler, queryAllPages, setAnalyticsStoreForTests, type AnalyticsStore } from '../src/handler.js';
+import { aggregate, undoAggregate, handler, queryAllPages, setAnalyticsStoreForTests, type AnalyticsStore } from '../src/handler.js';
 import { jwtVerify } from 'jose';
 
 const id = { tenant: '11111111-1111-4111-8111-111111111111', user: '22222222-2222-4222-8222-222222222222',
@@ -203,5 +203,33 @@ describe('analytics updater parity', () => {
     await expect(aggregate(event({ logged_at: '2026-11-19T07:30:00' }))).rejects.toThrow('timezone');
     await expect(handler({ Records: [{ messageId: 'bad', body: JSON.stringify(event({ status: 'bad' })) }] }))
       .resolves.toEqual({ batchItemFailures: [{ itemIdentifier: 'bad' }] });
+  });
+
+  it('undoes exactly what ActivityLogged added, once, and leaves STREAK and BADGE alone', async () => {
+    const detail = event({ challenge_ids: [id.challenge], logged_at: '2026-11-19T13:00:00+05:30' });
+    await aggregate(detail);
+    await aggregate(event({ log_id: '77777777-7777-4777-8777-777777777777', challenge_ids: [id.challenge], logged_at: '2026-11-19T07:45:00Z' }));
+    const streak = { ...get('STREAK') };
+    await undoAggregate(detail); await undoAggregate(detail);
+    await handler({ 'detail-type': 'ActivityLogDeleted', detail });
+    expect(get('DAY#2026-11-19')?.done).toBe(1); expect(get(`ACTIVITY#${id.activity}#DAY#2026-11-19`)?.done).toBe(1);
+    expect(get('HOUR#07')).toMatchObject({ attempts: 1, successes: 1 });
+    expect(get('COHORT#2026-11-16')).toMatchObject({ done: 1, attempts: 1, successes: 1 });
+    expect(get(`PROGRESS#${id.challenge}`)?.count).toBe(1);
+    expect(get(`PROGRESS#${id.user}`, `TENANT#${id.tenant}#CHALLENGE#${id.challenge}`)?.count).toBe(1);
+    expect(get(`DELETED#${id.log}`)).toBeDefined(); expect(get('STREAK')).toEqual(streak);
+    await aggregate(detail);
+    expect(get('DAY#2026-11-19')?.done).toBe(1);
+  });
+
+  it('undoes a missed log without touching successes and ignores logs never counted', async () => {
+    await aggregate(event({ status: 'missed' }));
+    await undoAggregate(event({ status: 'missed' }));
+    expect(get('DAY#2026-11-19')?.missed).toBe(0); expect(get('HOUR#07')).toMatchObject({ attempts: 0, successes: 0 });
+    const other = event({ log_id: '88888888-8888-4888-8888-888888888888' });
+    await undoAggregate(other);
+    expect(get('DAY#2026-11-19')?.done).toBeUndefined();
+    await aggregate(other);
+    expect(get('DAY#2026-11-19')?.done).toBeUndefined();
   });
 });

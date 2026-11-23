@@ -93,13 +93,16 @@ async function writeLog(activity: typeof activities.$inferSelect, body: LogInput
   if (!activity.active) fail(source === 'manual' ? 404 : 404, 'Activity not found');
   const loggedAt = new Date(body.logged_at ?? new Date().toISOString());
   const id = randomUUID();
+  const challengeIds = await activeChallengeIds(activity, request);
+  // Remember which challenges counted this log so a later delete can undo exactly that.
+  const metadata = challengeIds.length ? { ...(extra.metadata ?? {}), challenge_ids: challengeIds } : extra.metadata ?? {};
   const inserted = await getDb().insert(activityLogs).values({ id, tenant_id: activity.tenant_id, user_id: activity.user_id, activity_id: activity.id,
     status: body.status, logged_at: loggedAt, source, source_event_id: extra.source_event_id ?? null,
-    duration_min: body.duration_min ?? null, metadata: extra.metadata ?? {} }).returning();
+    duration_min: body.duration_min ?? null, metadata }).returning();
   try { await publish('ActivityLogged', { tenant_id: activity.tenant_id, user_id: activity.user_id, activity_id: activity.id, log_id: id,
-    status: body.status, logged_at: loggedAt.toISOString().replace(/\.000Z$/, '+00:00').replace(/Z$/, '+00:00'), source, challenge_ids: await activeChallengeIds(activity, request) }); }
+    status: body.status, logged_at: loggedAt.toISOString().replace(/\.000Z$/, '+00:00').replace(/Z$/, '+00:00'), source, challenge_ids: challengeIds }); }
   catch { await getPool().query(`DELETE FROM "${getConfig().dbSchema}"."activity_logs" WHERE id=$1`, [id]); fail(502, 'Activity event could not be published'); }
-  return inserted[0]!;
+  return { ...inserted[0]!, metadata: extra.metadata ?? {} };
 }
 function mergedSchedule(body: Record<string, unknown>, existing: typeof activities.$inferSelect) {
   return cleanSchedule<Record<string, unknown> & { name: string; frequency?: string; days_of_week?: number[] }>({ name: existing.name, ...body }, existing);
@@ -148,6 +151,18 @@ export async function registerActivityRoutes(app: FastifyInstance): Promise<void
       if ((error as { cause?: { code?: string } }).cause?.code === '23505' || (error as { code?: string }).code === '23505') { const existing = (await getDb().select().from(activityLogs).where(and(eq(activityLogs.tenant_id, body.tenant_id), eq(activityLogs.source_event_id, body.source_event_id))).limit(1))[0]; if (existing?.activity_id === body.activity_id && existing.user_id === body.user_id) { reply.code(200); return { duplicate: true }; } fail(409, 'Source event is already in use'); }
       throw error;
     }
+  });
+  app.delete('/internal/logs/by-source/:event_id', { onRequest: requireInternal, schema: { hide: true, params: Type.Object({ event_id: Type.String({ minLength: 1, maxLength: 255 }) }), querystring: Type.Object({ tenant_id: Uuid }) } }, async (request, reply) => {
+    const { event_id } = request.params as { event_id: string }; const { tenant_id } = request.query as { tenant_id: string };
+    const rows = await getDb().delete(activityLogs).where(and(eq(activityLogs.tenant_id, tenant_id.toLowerCase()), eq(activityLogs.source_event_id, event_id.trim()))).returning();
+    const row = rows[0];
+    if (!row) fail(404, 'Activity log not found');
+    const stored = (row.metadata as { challenge_ids?: unknown }).challenge_ids;
+    const challengeIds = Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : [];
+    try { await publish('ActivityLogDeleted', { tenant_id: row.tenant_id, user_id: row.user_id, activity_id: row.activity_id, log_id: row.id, status: row.status,
+      logged_at: row.logged_at.toISOString().replace(/\.000Z$/, '+00:00').replace(/Z$/, '+00:00'), challenge_ids: challengeIds }); }
+    catch { await getDb().insert(activityLogs).values(row); fail(502, 'Activity event could not be published'); }
+    return reply.code(204).send();
   });
   app.get('/internal/users/:uid/logs', { onRequest: [requireInternal, requireUser], schema: { hide: true, params: Type.Object({ uid: Uuid }), querystring: Type.Object({ tenant_id: Type.Optional(Type.String({ format: 'uuid' })), since: Type.String({ format: 'date-time' }) }) } }, async request => {
     const { uid } = request.params as { uid: string }; const { since } = request.query as { since: string };

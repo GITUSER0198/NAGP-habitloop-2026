@@ -131,6 +131,8 @@ export async function aggregate(input: unknown): Promise<void> {
   const seenKey = `SEEN#${logId}`;
   const db = store();
   if (await db.get(pk, seenKey)) return;
+  // The log was deleted before its ActivityLogged event arrived: never count it.
+  if (await db.get(pk, `DELETED#${logId}`)) return;
   const targets = await challengeTargets({ ...detail, tenant_id: tenantId, user_id: userId }, ids);
 
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -179,20 +181,63 @@ export async function aggregate(input: unknown): Promise<void> {
   }
 }
 
+// Undo what aggregate() added for one log. STREAK and BADGE items are left unchanged on purpose.
+export async function undoAggregate(input: unknown): Promise<void> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Event detail must be an object');
+  const detail = input as Detail;
+  const tenantId = normalizedUuid(detail.tenant_id, 'tenant_id');
+  const userId = normalizedUuid(detail.user_id, 'user_id');
+  const activityId = normalizedUuid(detail.activity_id, 'activity_id');
+  const logId = normalizedUuid(detail.log_id, 'log_id');
+  if (!(statuses as readonly string[]).includes(detail.status)) throw new Error('Unknown activity status');
+  const timestamp = eventTimestamp(detail.logged_at, 'Invalid logged_at timestamp', 'logged_at requires a timezone');
+  const logged = timestamp.date;
+  if (detail.challenge_ids !== undefined && (!Array.isArray(detail.challenge_ids) || detail.challenge_ids.some((id) => typeof id !== 'string'))) throw new Error('challenge_ids must be an array of UUIDs');
+  const ids = [...new Set((detail.challenge_ids ?? []).map((id) => normalizedUuid(id, 'challenge_id')))].sort();
+  const pk = userPk(tenantId, userId);
+  const deletedKey = `DELETED#${logId}`;
+  const db = store();
+  if (await db.get(pk, deletedKey)) return;
+  const mutations: Mutation[] = [{ item: { PK: pk, SK: deletedKey, logged_at: timestamp.iso }, condition: 'absent' }];
+  // Only undo counts that ActivityLogged actually added (it leaves a SEEN marker).
+  if (await db.get(pk, `SEEN#${logId}`)) {
+    const day = dateString(logged);
+    const success = detail.status === 'missed' ? 0 : 1;
+    for (const prefix of ['', `ACTIVITY#${activityId}#`]) mutations.push({ item: { PK: pk, SK: `${prefix}DAY#${day}` }, add: { [detail.status]: -1 } });
+    mutations.push({ item: { PK: pk, SK: `HOUR#${String(logged.getUTCHours()).padStart(2, '0')}` }, add: { attempts: -1, successes: -success } });
+    mutations.push({ item: { PK: pk, SK: `COHORT#${monday(logged)}` }, add: { [detail.status]: -1, attempts: -1, successes: -success } });
+    if (success) for (const id of ids) {
+      mutations.push({ item: { PK: pk, SK: `PROGRESS#${id}` }, add: { count: -success } },
+        { item: { PK: challengePk(tenantId, id), SK: `PROGRESS#${userId}` }, add: { count: -success } });
+    }
+  }
+  if (mutations.length > 100) throw new Error('Activity event exceeds DynamoDB transaction capacity');
+  try { await db.transact(mutations); }
+  catch (error) {
+    const failure = error as { name?: string };
+    if (failure.name === 'TransactionCanceledException' && await db.get(pk, deletedKey)) return;
+    throw error;
+  }
+}
+
 function eventDetail(event: unknown): unknown {
   if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Expected an event object');
   const value = event as { detail?: unknown };
   return Object.hasOwn(value, 'detail') ? value.detail : event;
 }
+function dispatch(event: unknown): Promise<void> {
+  const type = event && typeof event === 'object' ? (event as Record<string, unknown>)['detail-type'] : undefined;
+  return type === 'ActivityLogDeleted' ? undoAggregate(eventDetail(event)) : aggregate(eventDetail(event));
+}
 export async function handler(event: Record<string, unknown>): Promise<{ batchItemFailures: Array<{ itemIdentifier: string }> }> {
-  if (!('Records' in event)) { await aggregate(eventDetail(event)); return { batchItemFailures: [] }; }
+  if (!('Records' in event)) { await dispatch(event); return { batchItemFailures: [] }; }
   if (!Array.isArray(event.Records)) throw new Error('Records must be an array');
   const batchItemFailures: Array<{ itemIdentifier: string }> = [];
   for (const entry of event.Records) {
     const record = entry as { messageId?: unknown; body?: unknown };
     try {
       if (typeof record.body !== 'string' || typeof record.messageId !== 'string') throw new Error('Malformed SQS record');
-      await aggregate(eventDetail(JSON.parse(record.body) as unknown));
+      await dispatch(JSON.parse(record.body) as unknown);
     } catch {
       if (typeof record.messageId === 'string') batchItemFailures.push({ itemIdentifier: record.messageId });
     }

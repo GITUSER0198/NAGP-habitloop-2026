@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { and, count, desc, eq, gte, max } from 'drizzle-orm';
+import { and, count, desc, eq, gte, max, ne } from 'drizzle-orm';
 import { getConfig, getDb, invalidInput, publish, requireInternal, requireUser, type UserClaims } from '@habitloop/shared';
 import { wearableStats, type WearableLog } from '../stats.js';
 import { links, partnerEvents } from '../db/schema.js';
@@ -140,7 +140,7 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
     const now = new Date();
     // Include an extra UTC day so every local date in the requested window is covered.
     const since = new Date(now.getTime() - (days + 1) * 86400000).toISOString();
-    const scope = and(eq(partnerEvents.link_id, link.id), eq(partnerEvents.tenant_id, link.tenant_id));
+    const scope = and(eq(partnerEvents.link_id, link.id), eq(partnerEvents.tenant_id, link.tenant_id), ne(partnerEvents.status, 'deleted'));
     const [events, logs, counts] = await Promise.all([
       getDb().select().from(partnerEvents).where(and(scope, gte(partnerEvents.received_at, new Date(since))))
         .orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)),
@@ -164,7 +164,22 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
     const user = id(request); const linkId = (request.params as { id: string }).id;
     const owned = await getDb().select({ id: links.id, tenant_id: links.tenant_id }).from(links).where(and(eq(links.id, linkId), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1);
     if (!owned.length) fail(404, 'Link not found');
-    return getDb().select().from(partnerEvents).where(and(eq(partnerEvents.link_id, linkId), eq(partnerEvents.tenant_id, owned[0]!.tenant_id))).orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)).limit(50);
+    return getDb().select().from(partnerEvents).where(and(eq(partnerEvents.link_id, linkId), eq(partnerEvents.tenant_id, owned[0]!.tenant_id), ne(partnerEvents.status, 'deleted'))).orderBy(desc(partnerEvents.received_at), desc(partnerEvents.id)).limit(50);
+  });
+  app.delete('/links/:link_id/events/:event_id', { onRequest: requireUser, schema: { params: Type.Object({ link_id: Uuid, event_id: Uuid }) } }, async (request, reply) => {
+    const user = id(request); const params = request.params as { link_id: string; event_id: string };
+    // Authorize by link owner, not by the token's community: a wearable belongs to the person.
+    const link = (await getDb().select().from(links).where(and(eq(links.id, params.link_id), eq(links.user_id, user.userId), eq(links.status, 'active'))).limit(1))[0];
+    if (!link) fail(404, 'Link not found');
+    const event = (await getDb().select().from(partnerEvents).where(and(eq(partnerEvents.id, params.event_id), eq(partnerEvents.link_id, link.id),
+      eq(partnerEvents.tenant_id, link.tenant_id), ne(partnerEvents.status, 'deleted'))).limit(1))[0];
+    if (!event) fail(404, 'Event not found');
+    const response = await fetch(`${process.env.ACTIVITY_SERVICE_URL ?? 'http://activity-service:47820'}/api/activities/internal/logs/by-source/${encodeURIComponent(event.id)}?tenant_id=${link.tenant_id}`, {
+      method: 'DELETE', headers: { 'x-internal-token': getConfig().internalToken }, signal: AbortSignal.timeout(5000) }).catch(() => undefined);
+    // 404 means no activity log was created from this event (pending or rejected), which is fine.
+    if (!response || (!response.ok && response.status !== 404)) fail(502, 'Workout could not be deleted');
+    await getDb().update(partnerEvents).set({ status: 'deleted' }).where(and(eq(partnerEvents.id, event.id), eq(partnerEvents.tenant_id, link.tenant_id)));
+    return reply.code(204).send();
   });
   app.post('/ingest/:link_id', { schema: { params: Type.Object({ link_id: Uuid }) } }, async (request, reply) => {
     const linkId = (request.params as { link_id: string }).link_id;
@@ -204,9 +219,11 @@ export async function registerIntegrationRoutes(app: FastifyInstance): Promise<v
     const reason = body.reason?.trim() ?? null;
     if (reason !== null && (reason.length < 1 || reason.length > 1000)) invalidInput('Reason must contain between 1 and 1000 characters', body.reason, ['body', 'reason']);
     const user = id(request);
-    const existing = await getDb().select({ id: partnerEvents.id }).from(partnerEvents).innerJoin(links, eq(links.id, partnerEvents.link_id))
+    const existing = await getDb().select({ id: partnerEvents.id, status: partnerEvents.status }).from(partnerEvents).innerJoin(links, eq(links.id, partnerEvents.link_id))
       .where(and(eq(partnerEvents.id, eventId), eq(partnerEvents.tenant_id, user.tenantId), eq(links.tenant_id, user.tenantId), eq(links.user_id, user.userId))).limit(1);
     if (!existing.length) fail(404, 'Partner event not found');
+    // A deleted event stays deleted even if the normalizer finishes late.
+    if (existing[0]!.status === 'deleted') return (await getDb().select().from(partnerEvents).where(eq(partnerEvents.id, eventId)).limit(1))[0];
     const rows = await getDb().update(partnerEvents).set({ status: body.status, reason }).where(and(eq(partnerEvents.id, eventId), eq(partnerEvents.tenant_id, user.tenantId))).returning();
     return rows[0];
   });

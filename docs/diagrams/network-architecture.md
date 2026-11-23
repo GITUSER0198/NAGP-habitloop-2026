@@ -1,9 +1,12 @@
 # HabitLoop network architecture
 
+dg-habitloop, ap-south-1. Dhruv Goel.
 
 The [editable draw.io file](network-architecture.drawio) is the primary diagram. It flows left
 to right (clients, edge, VPC, managed services) in the HabitLoop Midnight palette and uses the
 diagrams.net AWS 2019 `mxgraph.aws4` icons. This Mermaid diagram is the text fallback with the
+same structure and the same step numbers 1 to 8. Both describe the dg-habitloop deployment in ap-south-1,
+not an asserted live deployment.
 
 Line key: solid = synchronous request, dashed = asynchronous event path, dotted = management,
 logging, egress or pairing link. Numbered circles follow the case study flow (see the table below).

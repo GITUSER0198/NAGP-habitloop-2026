@@ -36,6 +36,9 @@ fun WearablesScreen(api: HabitApi, store: TokenStore) {
     var error by remember { mutableStateOf<String?>(null) }
     var refreshedAt by remember { mutableStateOf<String?>(null) }
     var expanded by rememberSaveable { mutableStateOf(false) }
+    var hidden by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pendingDelete by remember { mutableStateOf<WearableWorkout?>(null) }
+    var deleting by remember { mutableStateOf(false) }
     suspend fun reload() {
         if (refreshing) return
         refreshing = true
@@ -72,9 +75,35 @@ fun WearablesScreen(api: HabitApi, store: TokenStore) {
             while (true) { reload(); delay(15_000) }
         }
     }
-    val workouts = WearableStats.workouts(events, logs)
+    val workouts = WearableStats.workouts(events, logs).filter { it.eventId !in hidden }
     val lastSync = (events.map { it.receivedAt } + logs.map { it.loggedAt })
         .mapNotNull { WearableStats.instant(it) }.maxOrNull()?.toString()
+    pendingDelete?.let { target ->
+        val partner: PartnerEvent? = events.firstOrNull { it.eventId == target.eventId }
+        AlertDialog(
+            onDismissRequest = { if (!deleting) pendingDelete = null },
+            title = { Text("Delete workout") },
+            text = { Text("Delete this workout? It is removed from your stats.") },
+            confirmButton = {
+                TextButton(enabled = !deleting && partner != null, onClick = {
+                    val toDelete: PartnerEvent = partner ?: return@TextButton
+                    deleting = true
+                    scope.launch {
+                        try {
+                            api.deleteWorkout(toDelete.linkId, toDelete.id)
+                            hidden = hidden + target.eventId
+                            events = events.filter { it.id != toDelete.id }
+                            pendingDelete = null
+                            reload()
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) { error = e.message ?: "The workout could not be deleted."; pendingDelete = null }
+                        finally { deleting = false }
+                    }
+                }) { Text(if (deleting) "Deleting..." else "Delete") }
+            },
+            dismissButton = { TextButton(enabled = !deleting, onClick = { pendingDelete = null }) { Text("Cancel") } }
+        )
+    }
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { scope.launch { reload() } }, modifier = Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
@@ -117,6 +146,9 @@ fun WearablesScreen(api: HabitApi, store: TokenStore) {
                         Text("Duration: ${workout.duration} min | Steps: ${workout.steps}")
                         Text("Average heart rate: ${workout.heartRate} bpm")
                         Text(WearableStats.displayTime(workout.time))
+                        if (events.any { it.eventId == workout.eventId }) {
+                            TextButton(onClick = { pendingDelete = workout }) { Text("Delete workout") }
+                        }
                     }
                 }
             }

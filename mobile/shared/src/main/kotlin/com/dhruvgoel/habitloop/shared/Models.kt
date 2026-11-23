@@ -176,6 +176,7 @@ data class ChallengeProgress(val leaderboard: List<LeaderboardEntry> = emptyList
 @Serializable
 data class PartnerEvent(
     val id: String = "",
+    @SerialName("link_id") val linkId: String = "",
     @SerialName("event_id") val eventId: String = "",
     val status: String = "",
     val reason: String? = null,

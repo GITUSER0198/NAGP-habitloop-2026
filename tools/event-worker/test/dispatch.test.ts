@@ -41,6 +41,16 @@ describe('event worker HTTP parity', () => {
     } finally { await app.close(); }
   });
 
+  it('routes ActivityLogDeleted to the analytics updater with its detail-type', async () => {
+    const app = await createWorker();
+    try {
+      const detail = { tenant_id: 'tenant', log_id: 'log' };
+      const response = await app.inject({ method: 'POST', url: '/events', headers: { 'x-internal-token': 'worker-internal' }, payload: { 'detail-type': 'ActivityLogDeleted', detail } });
+      expect(response.statusCode).toBe(202);
+      expect(updater).toHaveBeenCalledExactlyOnceWith({ 'detail-type': 'ActivityLogDeleted', detail });
+    } finally { await app.close(); }
+  });
+
   it('stops dispatch after a failed handler and preserves handler order', async () => {
     const calls: number[] = [];
     const app = await createWorker({ Test: [async () => { calls.push(1); }, async () => { calls.push(2); throw new Error('failed'); }, async () => { calls.push(3); }] });

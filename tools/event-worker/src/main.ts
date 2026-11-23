@@ -9,7 +9,8 @@ import { handler as updateAnalytics } from '@habitloop/analytics-updater';
 export type EventHandler = (detail: Record<string, unknown>) => Promise<unknown>;
 const handlers: Record<string, EventHandler[]> = {
   PartnerEventReceived: [async detail => normalizePartner(detail)],
-  ActivityLogged: [async detail => updateAnalytics(detail)]
+  ActivityLogged: [async detail => updateAnalytics(detail)],
+  ActivityLogDeleted: [async detail => updateAnalytics({ 'detail-type': 'ActivityLogDeleted', detail })]
 };
 
 function validateEvent(body: unknown): Array<Record<string, unknown>> {

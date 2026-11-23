@@ -222,6 +222,7 @@ secret and public routing blocks `/api/*/internal` before other paths.
 AWS tasks have separate IAM task roles and a shared execution role for image pulls, logs, and
 secret injection. Secrets Manager supplies the RDS-managed database credential, JWT secret and
 internal token. Lambda secrets also appear in encrypted Lambda environment values and private
+configuration. Keep `.env` out of version control. Do not show
 secret values, cookies or the one-time ingest key in screenshots or recordings.
 
 CloudFront terminates viewer TLS; its ALB origin uses HTTP 80. The ALB security group admits

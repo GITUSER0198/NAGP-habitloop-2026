@@ -16,6 +16,9 @@
   let busy = $state(false);
   let now = $state(Date.now());
   let refreshError = $state('');
+  let confirming = $state<string | null>(null);
+  let removed = $state<string[]>([]);
+  let deleteError = $state('');
   const watches = $derived(data.links.filter(link => link.provider === 'galaxywatch'));
   const simulators = $derived(data.providers.filter(provider => provider.provider !== 'galaxywatch'));
   function syncTime(value: string): string {
@@ -69,6 +72,18 @@
       } finally { busy = false; }
     };
   };
+  // Optimistic removal: hide the row at once, restore it if the server refuses, then refresh stats.
+  const deleteWorkout: SubmitFunction = ({ formData }) => {
+    const workoutId = String(formData.get('event_id') ?? '');
+    removed = [...removed, workoutId]; confirming = null; deleteError = '';
+    return async ({ result }) => {
+      const restore = (message: string): void => { removed = removed.filter(item => item !== workoutId); deleteError = message; };
+      try {
+        if (result.type === 'success') { await invalidate('wearable:stats'); removed = removed.filter(item => item !== workoutId); }
+        else restore(result.type === 'failure' && typeof result.data?.message === 'string' ? result.data.message : 'The workout could not be deleted. Try again.');
+      } catch { restore('The workout was deleted but the list could not refresh. Reload the page.'); }
+    };
+  };
   async function copy(value: string): Promise<void> {
     try { await navigator.clipboard.writeText(value); copyMessage = 'Copied.'; }
     catch { copyMessage = 'Copy unavailable. Select the text and copy it manually.'; }
@@ -106,16 +121,25 @@
     </section>
     <section>
       <h2>Recent workouts</h2>
-      {#if stats.workouts.length}
+      {#if deleteError}<p class="error" role="alert">{deleteError}</p>{/if}
+      {#if stats.workouts.some(row => !removed.includes(row.id))}
         <ul class="workouts">
-          {#each stats.workouts.slice(0, 20) as workout (workout.id)}
+          {#each stats.workouts.filter(row => !removed.includes(row.id)).slice(0, 20) as workout (workout.id)}
             <li>
               <svg class="workout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                 {#if workout.type === 'cycle'}<circle cx="5" cy="17" r="4"/><circle cx="19" cy="17" r="4"/><path d="m5 17 5-10 5 10H5l8-7h4M8 7h4m3-3h3l2 5"/>
                 {:else if workout.type === 'run'}<circle cx="15" cy="4" r="2"/><path d="m12 8 4 4 4-2M4 11l5-3 4 1-3 7-6 5m6-5 5 1 2 5"/>
                 {:else}<circle cx="13" cy="4" r="2"/><path d="m7 21 3-7 2-6 3 5 4 1m-9 0 4 3 1 4M6 12l3-4h3"/>{/if}
               </svg>
-              <div class="workout-body"><div class="workout-heading"><strong class="capitalize">{workout.type}</strong><span class="chip" class:rejected={workout.status === 'Rejected'}>{workout.status}</span></div>
+              <div class="workout-body"><div class="workout-heading"><strong class="capitalize">{workout.type}</strong><span class="chip" class:rejected={workout.status === 'Rejected'}>{workout.status}</span>
+                  {#if confirming !== workout.id}<button type="button" class="text icon-button" aria-label="Delete workout" title="Delete workout" onclick={() => { confirming = workout.id; }}><Icon name="trash" size={18} /></button>{/if}</div>
+                {#if confirming === workout.id}
+                  <form method="POST" action="?/deleteWorkout" use:enhance={deleteWorkout} class="confirm" aria-label="Confirm delete">
+                    <input type="hidden" name="link_id" value={watch.id} /><input type="hidden" name="event_id" value={workout.id} />
+                    <span>Delete this workout? It is removed from your stats.</span>
+                    <button type="submit">Delete</button><button type="button" class="outlined" onclick={() => { confirming = null; }}>Cancel</button>
+                  </form>
+                {/if}
                 <p>{workout.duration_min ?? 'Unknown'} min &middot; {workout.steps ?? 'Unknown'} steps &middot; {workout.avg_heart_rate === null ? 'Heart rate unavailable' : `${workout.avg_heart_rate} bpm`}</p>
                 <time class="muted" datetime={workout.started_at}>{formatDateTime(workout.started_at)}</time>
                 {#if workout.status === 'Rejected'}<p class="error">{workout.reason ?? 'No rejection reason supplied'}</p>{/if}
@@ -211,6 +235,8 @@
   .workout-body { min-width: 0; flex: 1; }
   .workout-body p { margin: .35rem 0; overflow-wrap: anywhere; }
   .workout-heading { justify-content: space-between; }
+  .icon-button { min-height: 2rem; padding: .25rem .5rem; color: var(--hl-danger); }
+  .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: .35rem 0; }
   .capitalize, label { text-transform: capitalize; }
   .pipeline { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin: 1rem 0; }
   .pipeline strong { color: var(--hl-accent); }

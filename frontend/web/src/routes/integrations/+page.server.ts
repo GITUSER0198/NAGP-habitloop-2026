@@ -59,5 +59,15 @@ export const actions: Actions = {
       return { message: 'Provider disconnected.' };
     } catch (cause) { return actionFailure(cause); }
   },
+  deleteWorkout: async (event) => {
+    requireFeature('integrations');
+    try {
+      const data = await event.request.formData();
+      const link = resourceId(field(data, 'link_id'));
+      const workout = resourceId(field(data, 'event_id'));
+      await apiResponse(event, `/api/integrations/links/${link}/events/${workout}`, { method: 'DELETE' });
+      return { message: 'Workout deleted.' };
+    } catch (cause) { return actionFailure(cause); }
+  },
   events: async () => { requireFeature('integrations'); return { message: 'Recent events updated.' }; }
 };

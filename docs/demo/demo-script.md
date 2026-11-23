@@ -6,6 +6,7 @@ Use the deployed CloudFront URL, a new walkthrough user, and the seeded owner ac
 the one-time ingest command off camera. Capture console evidence using the filenames in the
 [deployment checklist](../deployment/README.md#screenshot-checklist).
 
+Before recording, confirm the AWS deployment in ap-south-1 is complete, build-push and frontend asset sync, confirm
 the SNS subscription, and run seed and smoke against AWS. Have all console tabs open, filtered
 to `dg-habitloop` in the selected region, with resource detail tabs ready. Pre-enter nonsensitive
 form fields where useful; type passwords off camera. Keep CloudFront and IAM global screens

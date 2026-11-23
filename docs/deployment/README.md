@@ -5,55 +5,54 @@ exports the network PNG and records the demo. No deployment or console evidence 
 by the presence of this guide. Architecture details are in the [root README](../../README.md)
 and [network diagram](../diagrams/network-architecture.md).
 
-## 1. Prepare tools, credentials and variables
+## 1. Tools, credentials and naming
 
-Use Docker Desktop with Linux image builds, Node.js 22 with npm (the helper scripts are TypeScript run with `tsx`; run `npm ci` once), Git,
-
-Start in the repo root. Authenticate using your normal AWS credential chain or configured
-profile and check the intended account before provisioning:
+Use Docker Desktop with Linux image builds, Node.js 22 with npm (the helper scripts are
+TypeScript run with `tsx`; run `npm ci` once), Git and the AWS CLI. Do not vendor tools into the
+repository. Authenticate using your normal AWS credential chain or configured profile and check
+the intended account:
 
 ```sh
 aws sts get-caller-identity
 ```
 
-These commands work in both shells. For an SSO profile, sign in using your configured profile
-and set `AWS_PROFILE` in that terminal (`$env:AWS_PROFILE = 'your-profile'` in PowerShell,
-`export AWS_PROFILE='your-profile'` on macOS). The deployment principal needs permission to
-provision the resources and pass the scoped ECS and Lambda roles.
+For an SSO profile, sign in and set `AWS_PROFILE` in that terminal (`$env:AWS_PROFILE =
+'your-profile'` in PowerShell, `export AWS_PROFILE='your-profile'` on macOS).
 
-| Windows PowerShell | macOS |
-|---|---|
+All resources are in `ap-south-1` and use the `dg-habitloop` name prefix. Every resource carries
+the tags Project = HabitLoop, Owner = Dhruv Goel, OwnerInitials = dg and Course = NAGP Case
+Study 3. The alarm topic has one confirmed email subscription. `.env` is for Compose and is not
+the AWS configuration source.
 
-Edit that private file before applying:
+## 2. Architecture and resource list
 
-```hcl
-region      = "ap-south-1"
-name_prefix = "dg-habitloop"
-alarm_email = "your-real-email@example.com"
-image_tag   = "initial-build-required"
-```
+- **Network:** VPC `dg-habitloop-vpc` 10.20.0.0/16 across two AZs with six /24 subnets (public,
+  app, data), an internet gateway, one NAT gateway, S3 and DynamoDB gateway endpoints on the app
+  route table, and a data route table with no default route. Three tier NACLs and VPC flow logs.
+- **Security groups:** ALB (CloudFront prefix list plus the NAT `/32` on 80), app (from ALB on
+  47809/47820, self on 47820), database (from app on 5432).
+- **Compute:** ECS cluster with seven Fargate services (0.25 vCPU/512 MiB), one task each,
+  CPU target tracking 60% scaling 1 to 3 (60 s scale-out, 120 s scale-in cooldowns). Backend
+  ports are 47820 and web is 47809. Seven immutable ECR repositories with scan-on-push and a
+  lifecycle that keeps five images. Cloud Map for service discovery.
+- **Edge:** Application Load Balancer (HTTP 80) with a priority-1 rule returning 404 for
+  `/api/*/internal`, six API path rules and web as default. CloudFront with viewer HTTPS redirect,
+  an ALB origin for `/api/*` and dynamic pages without caching, and a private S3 bucket through
+  OAC for `/_app/*` and static files.
+- **Data:** RDS PostgreSQL 16 (`db.t4g.micro`, encrypted, private, single AZ, two-subnet data
+  group, seven-day backups) and a DynamoDB on-demand analytics table (PK/SK).
+- **Events:** custom EventBridge bus with PartnerEventReceived and ActivityLogged rules, two SQS
+  input queues each with a DLQ (SSE, visibility 720 s, maxReceiveCount 3), and two Node.js 22
+  Lambdas (`event-normalizer`, `analytics-updater`; 512 MiB, 120 s, VPC-attached, batch size 1
+  with ReportBatchItemFailures).
+- **Secrets and IAM:** Secrets Manager holds the RDS-managed credential, JWT secret and internal
+  token. Per-service task roles, one shared execution role and two Lambda roles are scoped to the
+  bus, table and queues.
+- **Observability:** CloudWatch dashboard `dg-habitloop-ops`, alarms (p95 latency, 5xx, auth
+  failures, stopped tasks, queue depth, DLQ depth), log groups (30 days) and an SNS alarm topic
+  with an email subscription.
 
-Replace the email with your alarm recipient; keep `image_tag` temporary until the build step.
-Use a lowercase `name_prefix` of at most 20 characters. Keep the owner prefix in resource names.
-The five provider tags are Project, Owner, OwnerInitials, Course and ManagedBy.
-The default backend is local state. State contains generated secrets and Lambda environment
-remote backend. `.env` is for Compose and is not the AWS configuration source.
-
-## 2. Apply part 1: foundation
-
-On a fresh environment, create the network, repositories, database, table, secrets and roles
-before trying to build-push. Run from the repo root in either shell:
-
-```sh
-```
-
-follows in part 2. If this foundation already exists, inspect its outputs and skip recreating it.
-Expected outputs include `name_prefix`, `region`, `repository_urls`, subnet IDs, security group
-IDs, `database_address`, `secret_arns` and `dynamodb_table_name`. ARN references are safe to
-inspect; secret values are not. Check six subnets across two AZs, the NAT route and isolated
-data route table before proceeding. Initial RDS creation can take several minutes.
-
-## 3. Build-push images and Lambda ZIPs
+## 3. Images and Lambda packages
 
 Use the intended committed application revision in the checkout. The helper tags all seven
 images with the full `git rev-parse HEAD` SHA, builds `linux/amd64`, pushes to the seven immutable
@@ -63,52 +62,33 @@ ECR repositories, then builds the esbuild bundles and packages both Node.js 22 L
 |---|---|
 | `./infra/scripts/build-push.ps1` | `sh infra/scripts/build-push.sh` |
 
-Expected progress: seven image builds/pushes, then Lambda packaging. Root artifacts must be
-`event-normalizer.zip` and `analytics-updater.zip`, each holding one self-contained `handler.js`
-(Lambda handler `handler.handler`, runtime `nodejs22.x`). They are generated binaries, not source;
-do not stage them in Git. No image repository is needed for ZIP-based Lambdas.
+Root artifacts are `event-normalizer.zip` and `analytics-updater.zip`, each holding one
+self-contained `handler.js` (Lambda handler `handler.handler`, runtime `nodejs22.x`). They are
+generated binaries, not source; do not stage them in Git. Repositories reject an existing tag, so
+rerunning the same committed SHA can fail. Inspect repository state first; do not delete images
+or overwrite immutable tags as a workaround. Packaging just the ZIPs is available with
+`npm run package-lambdas`.
 
-existing tag. The helper does not skip existing tags, so rerunning the same committed SHA or
-resuming a partially pushed SHA can fail. Inspect repository state first; do not delete images
-or overwrite immutable tags as an automatic workaround. A new source revision needs a new
-committed SHA through the owner's normal reviewed workflow. Packaging just the ZIPs is available
-with `npm run package-lambdas`.
-
-## 4. Apply part 2: runtime
-
-From the root, in either shell:
-
-```sh
-```
-
-Cloud Map, custom EventBridge bus, two SQS input queues and two DLQs, two VPC-attached Lambdas,
-private frontend bucket, CloudFront, log groups, dashboard, alarms and SNS email subscription.
-Confirm the SNS email subscription, otherwise alarm delivery stays pending.
+## 4. Runtime notes to verify in the console
 
 Wait for the ECS deployment to stabilize, all seven target groups to show healthy targets,
 and CloudFront to finish deploying. API target checks use `/api/<svc>/health`; web uses
-`/onboarding`. Each service starts with one task and CPU tracking can scale from 1 to 3 at
-60% CPU (60-second scale-out, 120-second scale-in cooldowns). Each task is 0.25 vCPU/512 MiB.
-Placement is across available app subnets, with no guarantee of one task per AZ at minimum scale.
-
-Runtime notes to verify in the console:
+`/onboarding`. Placement is across available app subnets, with no guarantee of one task per AZ at
+minimum scale. Confirm the SNS email subscription, otherwise alarm delivery stays pending.
 
 - Viewer HTTPS redirects at CloudFront; origin traffic to the ALB is HTTP 80. There is no ACM
-  ALB certificate in this deployment. ALB ingress is the CloudFront origin-facing prefix list
-  plus the single NAT EIP `/32` needed by server-side web API calls.
+  ALB certificate in this deployment.
 - ALB listener priority 1 returns 404 for `/api/*/internal` and `/api/*/internal/*`. Six service
   rules forward both the exact API prefix and its child paths, preserving the path. The default
-  action forwards to web. Backend target ports are 47820 and web is 47809.
-- ECS and Lambda use app subnets without public IPs. RDS is single-AZ in the two-subnet data
-  subnet group, encrypted and private. App-to-RDS uses TLS on 5432. PostgreSQL schemas/tables
-  initialize at service startup, with no migration command required.
-- S3 and DynamoDB gateway endpoints attach to the app route table. ECR, Secrets Manager,
-  EventBridge, SQS and CloudWatch API access use HTTPS 443 through NAT; there are no interface
-  endpoints for those services. AWS-managed SQS polling invokes Lambda without inbound VPC ports.
+  action forwards to web.
+- ECS and Lambda use app subnets without public IPs. RDS is private and encrypted. App-to-RDS
+  uses TLS on 5432. PostgreSQL schemas/tables initialize at service startup.
+- ECR, Secrets Manager, EventBridge, SQS and CloudWatch API access use HTTPS 443 through NAT;
+  there are no interface endpoints for those services.
 - ECS execution-role secret injection reads the RDS-managed JSON credential and app secrets.
   Bootstrap constructs an escaped database URL with `sslmode=no-verify` (TLS encryption without
-  server certificate verification). Lambda secret values
-  rotation so the running tasks pick up fresh credentials.
+  server certificate verification). Redeploy ECS after DB credential rotation so the running
+  tasks pick up fresh credentials.
 
 ## 5. Deploy frontend assets
 
@@ -125,7 +105,7 @@ progress. This publishes the exact asset hashes referenced by the deployed serve
 on another platform can produce different hashes. Immutable assets get one-year cache metadata,
 others five minutes. It retains old asset keys so an older running server revision can still
 load its assets. The temporary container and extracted files are cleaned up after the operation.
-It does not deploy the Node server; server changes need new images and an apply with the new SHA.
+It does not deploy the Node server; server changes need new images deployed to the ECS services.
 
 CloudFront `/api/*`, HTML pages, form actions and SvelteKit data requests use the ALB without
 caching. `/_app/*`, configured static extensions and `/robots.txt` use S3 through OAC. Do not
@@ -135,13 +115,15 @@ make the S3 bucket public or upload an SPA fallback over server routes.
 
 Set `DEMO_PASSWORD` privately for demonstration accounts before seeding. The seed can read it
 from your local gitignored `.env`; AWS account passwords are created through the public APIs,
-reusing an existing seeded environment. Use the CloudFront output as the base URL, without
+not stored as configuration. Use a fresh deployment or the original demo password when
+reusing an existing seeded environment. Use the CloudFront distribution URL as the base URL, without
 `/api` or a trailing route. The public ALB DNS is deliberately restricted.
 
 | Step | Windows PowerShell | macOS |
 |---|---|---|
+| Set URL | `$awsBase = 'https://<distribution>.cloudfront.net'` | `aws_base='https://<distribution>.cloudfront.net'` |
 | Seed | `npm run seed -- --base-url $awsBase` | `npm run seed -- --base-url "$aws_base"` |
-| Smoke | `./infra/scripts/smoke.ps1 -BASE_URL $awsBase` | `sh infra/scripts/smoke.sh "$aws_base"` |
+| Smoke | `npm run smoke -- --base-url $awsBase` | `npm run smoke -- --base-url "$aws_base"` |
 
 Expect six seed stages and all twelve smoke steps PASS, including normalized partner delivery,
 replay deduplication, analytics, a repeated recommendation accept and test-community cleanup.
@@ -184,6 +166,7 @@ tokens hidden. Screenshots are produced during the owner's AWS deployment task.
 
 The editable diagram is `docs/diagrams/network-architecture.drawio`. Open it with diagrams.net
 and export `docs/diagrams/network-architecture.png` for deliverable 6. Screenshot evidence should
+reflect the actual deployment and selected region; do not substitute a planned value
 for an observed console value.
 
 ## Troubleshooting runtime
@@ -204,20 +187,15 @@ for an observed console value.
 ## Teardown and cost
 
 The owner should tear down after recording when the environment is no longer needed. Teardown
-is destructive and is not part of writing these documents. Preserve required evidence and data
-first. From the root, the existing helper prints a saved destroy plan and prompts with default No:
+is destructive. Preserve required evidence and data first, then delete the `dg-habitloop`
+resources in the account (ECS services and cluster, ALB, CloudFront, Lambdas, queues, RDS,
+DynamoDB table, S3 bucket, ECR repositories, secrets, alarms and the VPC with its NAT gateway).
 
-| Windows PowerShell | macOS |
-|---|---|
-| `./infra/scripts/destroy.ps1` | `sh infra/scripts/destroy.sh` |
-
-Approve only after reviewing the exact resource list. Empty input, EOF and anything other than
-`y` or `yes` cancel. S3 has no force-destroy: a nonempty web bucket can block teardown. The helper
-does not purge assets. Any asset removal requires a separate explicit decision and review of
-the keys to remove. RDS creates `dg-habitloop-db-final` and retains automated backups. A prior
-snapshot with that name can block another final snapshot; resolve it through a reviewed change,
-not by silently deleting it. Retained snapshots/backups and managed-secret recovery periods
-should be inspected after teardown. Keep the state until resource cleanup is verified.
+A nonempty web bucket must be emptied before it can be deleted; review the keys before removing
+them. RDS creates a `dg-habitloop-db-final` snapshot on deletion and retains automated backups. A
+prior snapshot with that name can block another final snapshot; resolve it through a reviewed
+change, not by silently deleting it. Retained snapshots/backups and managed-secret recovery
+periods should be inspected after teardown.
 
 This dev topology pays for seven continuously running Fargate tasks, ALB, NAT and its public
 IPv4 address, single-AZ RDS, log ingestion/storage, ECR and frontend storage/requests. NAT egress,
