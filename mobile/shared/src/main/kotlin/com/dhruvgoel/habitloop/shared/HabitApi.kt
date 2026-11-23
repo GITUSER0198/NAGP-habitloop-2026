@@ -166,6 +166,9 @@ class HabitApi(
         return HabitJson.decodeFromString(IntegrationLink.serializer(), check(call("POST", "/api/integrations/links", b)))
     }
 
+    suspend fun stats(linkId: String, days: Int = 7): WearStats =
+        HabitJson.decodeFromString(WearStats.serializer(), check(call("GET", "/api/integrations/links/$linkId/stats?days=$days")))
+
     /** Sends one signed partner event. Returns the HTTP status (202 accepted, 200 duplicate). */
     suspend fun ingest(linkId: String, ingestKey: String, body: String): Int {
         val sig: String = HmacSigner.sign(body, ingestKey)

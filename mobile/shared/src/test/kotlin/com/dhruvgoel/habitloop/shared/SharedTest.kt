@@ -54,4 +54,15 @@ class SharedTest {
         assertNull(item.status)
         assertEquals("12:05 AM", TimeFmt.to12h("00:05"))
     }
+
+    @Test
+    fun wearStatsParseAndFormat() {
+        val json: String = """{"today":{"date":"2026-11-23","steps":4200,"workouts":1,"active_minutes":12},
+            "workouts":[{"id":"e1","type":"walk","started_at":"2026-11-23T08:00:00Z","duration_min":12,"steps":900,
+            "avg_heart_rate":96.5,"status":"Pending","reason":null,"extra":1}]}"""
+        val stats: WearStats = HabitJson.decodeFromString(WearStats.serializer(), json)
+        assertEquals(4200, stats.today.steps)
+        assertEquals("Walk, 12 min", WearFmt.title(stats.workouts[0]))
+        assertEquals("1:30 PM", WearFmt.time12("2026-11-23T13:30:00Z", java.time.ZoneOffset.UTC))
+    }
 }

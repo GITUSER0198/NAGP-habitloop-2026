@@ -18,7 +18,13 @@ import androidx.health.services.client.data.ExerciseConfig
 import androidx.health.services.client.data.ExerciseLapSummary
 import androidx.health.services.client.data.ExerciseType
 import androidx.health.services.client.data.ExerciseUpdate
+import com.dhruvgoel.habitloop.shared.ApiException
+import com.dhruvgoel.habitloop.shared.HabitJson
+import com.dhruvgoel.habitloop.shared.PairingPayload
+import com.dhruvgoel.habitloop.shared.PartnerEvent
 import com.dhruvgoel.habitloop.shared.PartnerEvents
+import com.dhruvgoel.habitloop.shared.text
+import kotlinx.serialization.json.JsonObject
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
@@ -162,29 +168,60 @@ class ExerciseService : Service() {
     }
 }
 
-/** Sends one signed event and then watches the activity log for up to 30 seconds. */
+/** Sends one signed event and then watches the event status and activity log for up to 30 seconds. */
 object Sender {
+    private const val WAIT_MS: Long = 30_000
+
+    private fun fail(message: String) {
+        WorkoutState.phase.value = "failed"; WorkoutState.message.value = message
+    }
+
+    /** Returns true when the server accepted the event (200 duplicate or 202 accepted). */
+    private suspend fun post(session: Session, linkId: String, key: String, body: String): Boolean {
+        val host: String = session.host
+        try {
+            val code: Int = session.api.ingest(linkId, key, body)
+            Log.i(WEAR_TAG, "ingest status $code host $host")
+            if (code != 200 && code != 202) { fail("Send failed (HTTP $code) $host"); return false }
+            return true
+        } catch (e: ApiException) {
+            Log.w(WEAR_TAG, "ingest failed: HTTP ${e.code} host $host")
+            fail("Send failed (HTTP ${e.code}) $host")
+        } catch (e: java.io.IOException) {
+            Log.w(WEAR_TAG, "ingest failed: no connection host $host (${e.javaClass.simpleName})")
+            fail("No connection to $host")
+        } catch (e: Exception) {
+            Log.w(WEAR_TAG, "ingest failed: ${e.javaClass.simpleName} host $host")
+            fail("No connection to $host")
+        }
+        return false
+    }
+
     suspend fun send(context: Context, body: String, kind: String, startedAt: Instant) {
         val session: Session = Session.get(context)
-        val p = session.pairing
-        if (p == null) {
-            WorkoutState.phase.value = "failed"; WorkoutState.message.value = "Not paired"; return
-        }
-        try {
-            val code: Int = session.api.ingest(p.linkId, p.ingestKey, body)
-            Log.i(WEAR_TAG, "ingest status $code")
-            WorkoutState.phase.value = "sent"
-            WorkoutState.message.value = "Sent"
-        } catch (e: Exception) {
-            Log.w(WEAR_TAG, "ingest failed: ${e.message}")
-            WorkoutState.phase.value = "failed"
-            WorkoutState.message.value = "Send failed: ${e.message ?: e.javaClass.simpleName}"
-            return
-        }
-        val activityId: String = p.activityMap[kind] ?: return
-        val deadline: Long = System.currentTimeMillis() + 30_000
+        val p: PairingPayload? = session.pairing
+        if (p == null) { fail("Not paired"); return }
+        if (!post(session, p.linkId, p.ingestKey, body)) return
+        WorkoutState.phase.value = "sent"
+        WorkoutState.message.value = "Sent. Waiting to be logged..."
+        val eventId: String? = runCatching {
+            (HabitJson.parseToJsonElement(body) as? JsonObject)?.text("event_id")
+        }.getOrNull()
+        val activityId: String? = p.activityMap[kind]
+        val deadline: Long = System.currentTimeMillis() + WAIT_MS
         while (System.currentTimeMillis() < deadline) {
             delay(3000)
+            if (eventId != null) {
+                val ev: PartnerEvent? = try {
+                    session.authed { it.events(p.linkId) }.firstOrNull { it.eventId == eventId }
+                } catch (e: Exception) { null }
+                if (ev?.status == "rejected") {
+                    Log.w(WEAR_TAG, "event rejected")
+                    fail("Rejected: ${ev.reason?.takeIf { it.isNotBlank() } ?: "no reason given"}")
+                    return
+                }
+            }
+            if (activityId == null) continue
             val seen: Boolean = try {
                 session.authed { it.logs(activityId) }.any {
                     it.source == "partner" && runCatching { Instant.parse(it.loggedAt) >= startedAt.minusSeconds(2) }.getOrDefault(false)
@@ -196,11 +233,17 @@ object Sender {
                 return
             }
         }
+        Log.i(WEAR_TAG, "wait ended without a log")
+        WorkoutState.phase.value = "notlogged"
+        WorkoutState.message.value = if (activityId == null) "Sent" else
+            "Sent, not logged yet. It may be rejected: check the Wearable tab on the phone."
     }
 
     suspend fun sendSteps(context: Context, steps: Int) {
         val body: String = PartnerEvents.steps(startedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS), steps = steps)
         WorkoutState.kind.value = "steps"
         send(context, body, "steps", Instant.now().minusSeconds(5))
+        // Step sync has no workout screen: keep only the result message.
+        if (WorkoutState.phase.value != "idle") WorkoutState.phase.value = "idle"
     }
 }

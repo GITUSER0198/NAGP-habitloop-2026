@@ -38,7 +38,9 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Psychology
@@ -102,6 +104,9 @@ import com.dhruvgoel.habitloop.shared.PairingPayload
 import com.dhruvgoel.habitloop.shared.Summary
 import com.dhruvgoel.habitloop.shared.TimeFmt
 import com.dhruvgoel.habitloop.shared.TodayItem
+import com.dhruvgoel.habitloop.shared.WearDay
+import com.dhruvgoel.habitloop.shared.WearFmt
+import com.dhruvgoel.habitloop.shared.WearWorkout
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.delay
@@ -194,13 +199,16 @@ fun WearApp() {
             paired = session.isPaired
         }
     }
-    BackHandler(enabled = screen == "workouts" || screen == "settings") { screen = "home" }
+    var selected by remember { mutableStateOf<WearWorkout?>(null) }
+    BackHandler(enabled = screen == "workouts" || screen == "settings" || screen == "history") { screen = "home" }
     when {
         screen == "permissions" -> PermissionsScreen { launcher.launch(RUNTIME_PERMISSIONS) }
         !paired || screen == "signin" -> SignInScreen(session, showBack = paired) { paired = session.isPaired; screen = "home" }
-        screen == "workouts" -> WorkoutScreen(context) { screen = "home" }
+        screen == "workouts" -> WorkoutScreen(context, onBack = { screen = "home" }, onHistory = { screen = "history" })
+        screen == "history" -> HistoryScreen(session, onOpen = { selected = it; screen = "detail" }, onBack = { screen = "home" })
+        screen == "detail" && selected != null -> DetailScreen(session, selected!!, onBack = { screen = "history" })
         screen == "settings" -> SettingsScreen(session, onBack = { screen = "home" }, onSignOut = { session.store.clear(); paired = false; screen = "home" })
-        else -> HomeScreen(session, onWorkouts = { screen = "workouts" }, onSettings = { screen = "settings" })
+        else -> HomeScreen(session, onWorkouts = { screen = "workouts" }, onHistory = { screen = "history" }, onSettings = { screen = "settings" })
     }
 }
 
@@ -349,10 +357,11 @@ private fun StatusChip(status: String?) {
 }
 
 @Composable
-private fun HomeScreen(session: Session, onWorkouts: () -> Unit, onSettings: () -> Unit) {
+private fun HomeScreen(session: Session, onWorkouts: () -> Unit, onHistory: () -> Unit, onSettings: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var today by remember { mutableStateOf<List<TodayItem>>(emptyList()) }
     var summary by remember { mutableStateOf<Summary?>(null) }
+    var wearToday by remember { mutableStateOf<WearDay?>(null) }
     var info by remember { mutableStateOf("Loading...") }
     var failed by remember { mutableStateOf(false) }
     var logging by remember { mutableStateOf<TodayItem?>(null) }
@@ -361,6 +370,9 @@ private fun HomeScreen(session: Session, onWorkouts: () -> Unit, onSettings: () 
         try {
             today = session.authed { it.today() }
             summary = try { session.authed { it.summary() } } catch (e: Exception) { null }
+            wearToday = try {
+                session.pairing?.linkId?.let { id -> session.authed { it.stats(id, 1) }.today }
+            } catch (e: Exception) { null }
             failed = false
             info = if (today.isEmpty()) "No habits today" else ""
             Log.i(WEAR_TAG, "today loaded: ${today.size} habits")
@@ -397,6 +409,12 @@ private fun HomeScreen(session: Session, onWorkouts: () -> Unit, onSettings: () 
                     }
                 }
             }
+            wearToday?.let { t ->
+                item {
+                    Text("Today: ${t.steps ?: 0} steps, ${t.workouts} workouts", color = TextMuted, fontSize = 13.sp,
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
+                }
+            }
             if (info.isNotEmpty()) item {
                 Column(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(if (failed) Icons.Filled.CloudOff else Icons.Filled.EventAvailable, null,
@@ -418,6 +436,7 @@ private fun HomeScreen(session: Session, onWorkouts: () -> Unit, onSettings: () 
             }
             item { Spacer8() }
             item { NavButton("Start workout", Icons.Filled.DirectionsRun, true, onClick = onWorkouts) }
+            item { NavButton("History", Icons.Filled.History, false, onClick = onHistory) }
             item {
                 NavButton("Sync steps", Icons.Filled.Sync, false) {
                     scope.launch {
@@ -505,6 +524,12 @@ private fun SettingsScreen(session: Session, onBack: () -> Unit, onSignOut: () -
                 time = { IconBadge(Icons.Filled.Groups, Teal, NavyLight, 28.dp) },
                 modifier = Modifier.fillMaxWidth()) { }
         }
+        item {
+            TitleCard(onClick = {}, title = { Text(session.host, fontSize = 14.sp, maxLines = 2) },
+                subtitle = { Text("Sends data to", fontSize = 13.sp, color = TextMuted) },
+                time = { IconBadge(Icons.Filled.Send, Teal, NavyLight, 28.dp) },
+                modifier = Modifier.fillMaxWidth()) { }
+        }
         item { NavButton("Sign out", Icons.AutoMirrored.Filled.Logout, true, onClick = onSignOut) }
         item { NavButton("Back", Icons.Filled.Check, false, onClick = onBack) }
     }
@@ -529,7 +554,7 @@ private fun kindIcon(kind: String): ImageVector = when (kind) {
 }
 
 @Composable
-private fun WorkoutScreen(context: Context, onBack: () -> Unit) {
+private fun WorkoutScreen(context: Context, onBack: () -> Unit, onHistory: () -> Unit) {
     val phase by WorkoutState.phase.collectAsState()
     val steps by WorkoutState.steps.collectAsState()
     val hr by WorkoutState.heartRate.collectAsState()
@@ -566,9 +591,10 @@ private fun WorkoutScreen(context: Context, onBack: () -> Unit) {
             }
         }
         "sending" -> ScreenScaffold { StateMessage(Icons.Filled.Send, Amber, "Sending...") }
-        "sent" -> ScreenScaffold { StateMessage(Icons.Filled.Send, Teal, "Sent. Waiting to be logged...") }
-        "logged" -> ListScreenState(Icons.Filled.CheckCircle, Teal, "Logged", onBack)
-        "failed" -> ListScreenState(Icons.Filled.CloudOff, Danger, message.ifBlank { "Something went wrong" }, onBack)
+        "sent" -> ScreenScaffold { StateMessage(Icons.Filled.Send, Teal, message.ifBlank { "Sent. Waiting to be logged..." }) }
+        "logged" -> ListScreenState(Icons.Filled.CheckCircle, Teal, "Logged", onBack, onHistory)
+        "notlogged" -> ListScreenState(Icons.Filled.Send, Amber, message, onBack, onHistory)
+        "failed" -> ListScreenState(Icons.Filled.CloudOff, Danger, message.ifBlank { "Something went wrong" }, onBack, onHistory)
         else -> ListScreen {
             item { Title("Start workout") }
             listOf(Triple("walk", "Walk", Icons.Filled.DirectionsWalk), Triple("run", "Run", Icons.Filled.DirectionsRun),
@@ -581,7 +607,7 @@ private fun WorkoutScreen(context: Context, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ListScreenState(icon: ImageVector, tint: Color, text: String, onBack: () -> Unit) {
+private fun ListScreenState(icon: ImageVector, tint: Color, text: String, onBack: () -> Unit, onHistory: () -> Unit) {
     ListScreen {
         item { Spacer8() }
         item {
@@ -592,6 +618,122 @@ private fun ListScreenState(icon: ImageVector, tint: Color, text: String, onBack
             }
         }
         item { NavButton("New workout", Icons.Filled.DirectionsRun, true) { WorkoutState.phase.value = "idle"; WorkoutState.message.value = "" } }
+        item { NavButton("History", Icons.Filled.History, false, onClick = onHistory) }
+        item { NavButton("Back", Icons.Filled.Check, false, onClick = onBack) }
+    }
+}
+
+// ---------- history ----------
+
+private fun workoutIcon(type: String): ImageVector = when (type.lowercase()) {
+    "run" -> Icons.Filled.DirectionsRun
+    "cycle" -> Icons.Filled.DirectionsBike
+    "walk" -> Icons.Filled.DirectionsWalk
+    else -> Icons.Filled.FitnessCenter
+}
+
+@Composable
+private fun WorkoutStatusChip(status: String) {
+    val (label: String, fg: Color, bg: Color) = when (status.lowercase()) {
+        "logged" -> Triple("Logged", Color(0xFF04342C), Teal)
+        "rejected" -> Triple("Rejected", Color.White, Danger)
+        else -> Triple("Pending", Color(0xFF3B2A05), Amber)
+    }
+    Text(label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(bg).padding(horizontal = 8.dp, vertical = 2.dp))
+}
+
+private fun hrText(w: WearWorkout): String = w.avgHeartRate?.let { "${it.toInt()} bpm" } ?: "--"
+
+@Composable
+private fun HistoryScreen(session: Session, onOpen: (WearWorkout) -> Unit, onBack: () -> Unit) {
+    var workouts by remember { mutableStateOf<List<WearWorkout>?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val linkId: String? = session.pairing?.linkId
+        if (linkId == null) { error = "Not paired"; return@LaunchedEffect }
+        try {
+            workouts = session.authed { it.stats(linkId, 7) }.workouts
+        } catch (e: ApiException) {
+            error = "Could not load (HTTP ${e.code})"
+        } catch (e: Exception) {
+            error = "No connection to ${session.host}"
+        }
+    }
+    ListScreen {
+        item { Title("History") }
+        val list: List<WearWorkout>? = workouts
+        val err: String? = error
+        if (err != null) item { Body(err, Danger) }
+        else if (list == null) item { Body("Loading...", TextMuted) }
+        else if (list.isEmpty()) item { Body("No workouts in the last 7 days", TextMuted) }
+        else list.forEach { w ->
+            item {
+                TitleCard(
+                    onClick = { onOpen(w) },
+                    title = { Text(WearFmt.title(w), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    subtitle = {
+                        Text("${WearFmt.time12(w.startedAt)}, ${w.steps ?: 0} steps, ${hrText(w)}", fontSize = 12.sp, color = TextMuted, maxLines = 2)
+                    },
+                    time = { IconBadge(workoutIcon(w.type), Teal, NavyLight, 28.dp) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { WorkoutStatusChip(w.status) }
+            }
+        }
+        item { NavButton("Back", Icons.Filled.Check, false, onClick = onBack) }
+    }
+}
+
+@Composable
+private fun DetailScreen(session: Session, w: WearWorkout, onBack: () -> Unit) {
+    var confirming by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    BackHandler { if (confirming) confirming = false else onBack() }
+    if (confirming) {
+        ListScreen {
+            item { Title("Delete workout?", Danger) }
+            item { Body("${WearFmt.title(w)} at ${WearFmt.time12(w.startedAt)} will be removed from your log.") }
+            error?.let { e -> item { Body(e, Danger) } }
+            item {
+                Button(onClick = {
+                    val linkId: String = session.pairing?.linkId ?: return@Button
+                    busy = true; error = null
+                    scope.launch {
+                        try {
+                            session.authed { it.deleteWorkout(linkId, w.id) }
+                            Log.i(WEAR_TAG, "workout deleted")
+                            onBack()
+                        } catch (e: ApiException) {
+                            error = "Delete failed (HTTP ${e.code})"
+                        } catch (e: Exception) {
+                            error = "No connection to ${session.host}"
+                        }
+                        busy = false
+                    }
+                }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Danger, contentColor = Color.White),
+                    icon = { Icon(Icons.Filled.Delete, null, Modifier.size(22.dp)) },
+                    label = { Text(if (busy) "Deleting" else "Delete", fontSize = 14.sp) })
+            }
+            item { NavButton("Cancel", Icons.Filled.Close, false) { confirming = false } }
+        }
+        return
+    }
+    ListScreen {
+        item {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                IconBadge(workoutIcon(w.type), Teal, NavyLight, 36.dp)
+                Text(WearFmt.title(w), color = Teal, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+        item { Body(WearFmt.dateTime12(w.startedAt), TextMuted) }
+        item { Body("Steps: ${w.steps ?: "--"}") }
+        item { Body("Avg heart rate: ${hrText(w)}") }
+        item { Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) { WorkoutStatusChip(w.status) } }
+        w.reason?.takeIf { it.isNotBlank() }?.let { r -> item { Body("Reason: $r", Danger) } }
+        item { NavButton("Delete", Icons.Filled.Delete, true) { confirming = true } }
         item { NavButton("Back", Icons.Filled.Check, false, onClick = onBack) }
     }
 }
