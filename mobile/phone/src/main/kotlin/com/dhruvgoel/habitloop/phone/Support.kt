@@ -80,7 +80,10 @@ class ReminderWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val store = TokenStore(applicationContext)
         if (store.token == null) return Result.success()
-        val api = HabitApi(BuildConfig.API_BASE_URL) { store.token }
+        val api = HabitApi(BuildConfig.API_BASE_URL, { store.token }, reauth = {
+                if (store.email.isBlank() || store.password.isEmpty()) null
+                else try { HabitApi(BuildConfig.API_BASE_URL, { null }).login(store.email, store.password).token.also { store.token = it } } catch (e: Exception) { null }
+            })
         val today = try { api.today() } catch (e: Exception) { return Result.retry() }
         val now: LocalTime = LocalTime.now()
         val mgr = NotificationManagerCompat.from(applicationContext)

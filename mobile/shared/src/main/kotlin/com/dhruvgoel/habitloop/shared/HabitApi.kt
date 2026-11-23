@@ -13,7 +13,12 @@ import kotlinx.serialization.json.put
 
 class ApiException(val code: Int, message: String) : Exception(message)
 
-class HabitApi(private val baseUrl: String, private val tokenProvider: () -> String?) {
+/** [reauth] signs in again and returns a fresh token; called once when a signed-in request gets 401. */
+class HabitApi(
+    private val baseUrl: String,
+    private val tokenProvider: () -> String?,
+    private val reauth: (suspend () -> String?)? = null
+) {
 
     data class Reply(val code: Int, val body: String)
 
@@ -23,6 +28,19 @@ class HabitApi(private val baseUrl: String, private val tokenProvider: () -> Str
         body: String? = null,
         headers: Map<String, String> = emptyMap(),
         auth: Boolean = true
+    ): Reply {
+        val first: Reply = send(method, path, body, headers, if (auth) tokenProvider() else null)
+        if (first.code != 401 || !auth || reauth == null) return first
+        val fresh: String = reauth.invoke() ?: return first
+        return send(method, path, body, headers, fresh)
+    }
+
+    private suspend fun send(
+        method: String,
+        path: String,
+        body: String?,
+        headers: Map<String, String>,
+        token: String?
     ): Reply = withContext(Dispatchers.IO) {
         val conn: HttpURLConnection = URL(baseUrl.trimEnd('/') + path).openConnection() as HttpURLConnection
         try {
@@ -30,7 +48,7 @@ class HabitApi(private val baseUrl: String, private val tokenProvider: () -> Str
             conn.connectTimeout = 8000
             conn.readTimeout = 15000
             conn.setRequestProperty("Accept", "application/json")
-            if (auth) tokenProvider()?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
+            token?.let { conn.setRequestProperty("Authorization", "Bearer $it") }
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             if (body != null) {
                 conn.doOutput = true

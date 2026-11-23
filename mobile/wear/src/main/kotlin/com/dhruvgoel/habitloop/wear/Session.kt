@@ -9,7 +9,7 @@ import com.dhruvgoel.habitloop.shared.TokenStore
 /** Watch-side session: pairing data, an API client, and a silent re-login when the token expires. */
 class Session private constructor(context: Context) {
     val store: TokenStore = TokenStore(context.applicationContext)
-    val api: HabitApi get() = HabitApi(store.pairing?.baseUrl ?: BuildConfig.API_BASE_URL) { store.token }
+    val api: HabitApi get() = HabitApi(store.pairing?.baseUrl ?: BuildConfig.API_BASE_URL, { store.token })
 
     val pairing: PairingPayload? get() = store.pairing
     val isPaired: Boolean get() = store.pairing != null && store.token != null

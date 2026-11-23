@@ -79,7 +79,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             var dark by remember { mutableStateOf(prefs.getBoolean("dark", false)) }
             var token by remember { mutableStateOf(store.token) }
-            val api: HabitApi = remember { HabitApi(BuildConfig.API_BASE_URL) { store.token } }
+            val api: HabitApi = remember { HabitApi(BuildConfig.API_BASE_URL, { store.token }, reauth = {
+                if (store.email.isBlank() || store.password.isEmpty()) null
+                else try { HabitApi(BuildConfig.API_BASE_URL, { null }).login(store.email, store.password).token.also { store.token = it } } catch (e: Exception) { null }
+            }) }
             HabitLoopTheme(dark) {
                 val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
                 LaunchedEffect(Unit) {
@@ -151,7 +154,7 @@ fun LoginScreen(api: HabitApi, onDone: (com.dhruvgoel.habitloop.shared.AuthRespo
     }
 }
 
-private enum class Tab(val label: String) { Home("Home"), Dashboard("Dashboard"), Tips("Tips"), Wearables("Watch") }
+private enum class Tab(val label: String) { Home("Home"), Dashboard("Dashboard"), Tips("Tips"), Wearables("Wearable") }
 
 @Composable
 fun MainScaffold(api: HabitApi, store: TokenStore, dark: Boolean, onDark: (Boolean) -> Unit, onLogout: () -> Unit) {
@@ -352,18 +355,20 @@ fun TipsScreen(api: HabitApi) {
 @Composable
 fun WearablesScreen(api: HabitApi, store: TokenStore) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var status by remember { mutableStateOf(if (store.pairing != null) "Paired link on file. Press the button to send it again." else "Not paired yet.") }
+    var paired by remember { mutableStateOf(store.pairing != null) }
+    var status by remember { mutableStateOf(if (store.pairing != null) "Your wearable is paired. Workouts and daily steps flow into your habits." else "No wearable paired yet.") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Wearables", style = MaterialTheme.typography.titleLarge)
-        Text("Pair your Galaxy Watch. Walk, run and cycle workouts and daily steps flow into your habits.")
+        Text("Connect a Wear OS wearable. Walk, run and cycle workouts and daily steps flow into your habits.")
         Button(enabled = !busy, onClick = {
             busy = true; status = "Creating link..."
             scope.launch {
                 try {
                     val sent: Int = WatchPairing.pair(context, api, store)
-                    status = if (sent > 0) "Sent to $sent watch(es). Open HabitLoop on the watch." else "Link created, but no watch is connected."
+                    paired = sent > 0 || store.pairing != null
+                    status = if (sent > 0) "Paired. Open HabitLoop on your wearable." else "Link created, but no wearable is connected right now."
                 } catch (e: ApiException) {
                     status = "Failed: ${e.message}"
                 } catch (e: Exception) {
@@ -371,7 +376,7 @@ fun WearablesScreen(api: HabitApi, store: TokenStore) {
                 }
                 busy = false
             }
-        }, modifier = Modifier.semantics { contentDescription = "pair-watch" }) { Text("Pair Galaxy Watch") }
+        }, modifier = Modifier.semantics { contentDescription = "pair-watch" }) { Text(if (paired) "Re-pair wearable" else "Pair wearable") }
         Text(status, modifier = Modifier.semantics { contentDescription = "pair-status" })
     }
 }

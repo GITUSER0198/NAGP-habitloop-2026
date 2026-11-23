@@ -281,7 +281,7 @@ private fun PermissionsScreen(onContinue: () -> Unit) {
 private fun SignInScreen(session: Session, showBack: Boolean, onDone: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var status by remember { mutableStateOf("Open HabitLoop on the phone and press Pair Galaxy Watch, or sign in here.") }
+    var status by remember { mutableStateOf("Open HabitLoop on the phone and press Pair wearable (Wearables tab), or sign in here.") }
     var busy by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     ListScreen {
