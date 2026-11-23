@@ -1,8 +1,19 @@
 {
   "name": "habitloop",
   "private": true,
-  "engines": { "node": ">=22 <23" },
-  "workspaces": ["services/*", "services/shared/node", "lambdas/*", "tools/event-worker", "tools/seed", "tools/smoke", "tools/wearable-simulator", "infra/scripts"],
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "workspaces": [
+    "services/*",
+    "services/shared/node",
+    "lambdas/*",
+    "tools/event-worker",
+    "tools/seed",
+    "tools/smoke",
+    "tools/wearable-simulator",
+    "infra/scripts"
+  ],
   "scripts": {
     "build": "npm run build -w @habitloop/shared && npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -11,8 +22,9 @@
     "smoke": "tsx tools/smoke/src/smoke.ts",
     "simulate": "tsx tools/wearable-simulator/src/simulate.ts",
     "export-openapi": "tsx infra/scripts/export-openapi.ts",
-    "package-lambdas": "tsx infra/scripts/package-lambdas.ts",
-    "deploy": "tsx infra/scripts/deploy.ts"
+    "package-lambdas": "tsx infra/scripts/package-lambdas.ts"
   },
-  "devDependencies": { "tsx": "^4.20.6" }
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
 }
