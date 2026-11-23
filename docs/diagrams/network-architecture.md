@@ -1,117 +1,130 @@
-# AWS network architecture
+# HabitLoop network architecture
 
-The [editable draw.io XML](network-architecture.drawio) uses the diagrams.net AWS 2019
-`mxgraph.aws4` shape family. Open it with **File > Open from > Device** in diagrams.net,
-enable the AWS 2019 library if requested, and export `network-architecture.png` beside it.
-The PNG and deployment screenshots are owner-produced evidence. This Mermaid diagram is the
+
+The [editable draw.io file](network-architecture.drawio) is the primary diagram. It flows left
+to right (clients, edge, VPC, managed services) in the HabitLoop Midnight palette and uses the
+diagrams.net AWS 2019 `mxgraph.aws4` icons. This Mermaid diagram is the text fallback with the
+
+Line key: solid = synchronous request, dashed = asynchronous event path, dotted = management,
+logging, egress or pairing link. Numbered circles follow the case study flow (see the table below).
 
 ```mermaid
-flowchart TB
-    Client[Browser / signed wearable client]
-    CF[CloudFront, global edge]
-    Client -->|HTTPS TCP 443| CF
-    subgraph Region["AWS Region ap-south-1, default"]
-        S3[(Private S3 assets + OAC)]
-        EB[EventBridge custom bus]
-        SQS[SQS partner-events + activity-logged]
-        DLQ[Matching DLQs, after 3 receives]
-        DDB[(DynamoDB analytics)]
-        ECR[ECR, seven immutable image repositories]
-        SM[Secrets Manager]
-        CW[CloudWatch logs, dashboard and alarms]
-        SNS[SNS confirmed email]
-        subgraph VPC["VPC 10.20.0.0/16"]
-            IGW[Internet Gateway]
-            subgraph AZA["AZ a, first available AZ"]
-                subgraph PA["public-a 10.20.0.0/24"]
-                    ALBA[ALB node a]
-                    NAT[One NAT Gateway + EIP]
-                end
-                subgraph AA["app-a 10.20.10.0/24"]
-                    ECSA[ECS placement: six APIs + web]
-                    LA[Lambda ENI placement: two consumers]
-                end
-                subgraph DA["data-a 10.20.20.0/24"]
-                    DBA[RDS eligible data subnet a]
-                end
-            end
-            subgraph AZB["AZ b, second available AZ"]
-                subgraph PB["public-b 10.20.1.0/24"]
-                    ALBB[ALB node b, same ALB]
-                end
-                subgraph AB["app-b 10.20.11.0/24"]
-                    ECSB[ECS alternate placement / scaling]
-                    LB[Lambda alternate ENI placement]
-                end
-                subgraph DB["data-b 10.20.21.0/24"]
-                    DBB[RDS eligible data subnet b]
-                end
-            end
-            RDS[(One private RDS PostgreSQL instance, single AZ)]
-            VPCE[S3 + DynamoDB Gateway endpoints, app route table]
-            ALBA -->|HTTP TCP 47820 APIs, 47809 web| ECSA
-            ALBB -->|HTTP TCP 47820 APIs, 47809 web| ECSB
-            ECSA <-->|Internal HTTP TCP 47820, Cloud Map| ECSB
-            LA -->|Internal HTTP TCP 47820| ECSA
-            LB -->|Internal HTTP TCP 47820| ECSB
-            ECSA -->|PostgreSQL TLS TCP 5432| RDS
-            ECSB -->|PostgreSQL TLS TCP 5432| RDS
-            DBA -. subnet-group placement, no network port .-> RDS
-            DBB -. subnet-group placement, no standby .-> RDS
-            ECSA -->|AWS APIs TCP 443; web ALB TCP 80| NAT
-            ECSB -->|AWS APIs TCP 443; web ALB TCP 80| NAT
-            LA -->|AWS APIs TCP 443| NAT
-            LB -->|AWS APIs TCP 443| NAT
-            NAT -->|Egress TCP 80/443| IGW
-            ECSA -->|HTTPS TCP 443| VPCE
-            ECSB -->|HTTPS TCP 443| VPCE
-            LA -->|HTTPS TCP 443| VPCE
-            LB -->|HTTPS TCP 443| VPCE
-        end
-        IGW -->|HTTPS TCP 443, PutEvents| EB
-        IGW -->|HTTPS TCP 443, image pulls| ECR
-        IGW -->|HTTPS TCP 443, secret injection| SM
-        IGW -->|HTTPS TCP 443, logs| CW
-        IGW -->|HTTP TCP 80, web API calls from NAT EIP| ALBA
-        VPCE -->|HTTPS TCP 443| S3
-        VPCE -->|HTTPS TCP 443| DDB
-        EB -->|Managed delivery, no customer listener port| SQS
-        SQS -->|Managed redrive, no customer listener port| DLQ
-        SQS -->|Managed Lambda invocation, no inbound VPC port| LA
-        SQS -->|Managed Lambda invocation, no inbound VPC port| LB
-        CW -->|Managed alarm action, no customer listener port| SNS
+flowchart LR
+    classDef navy fill:#042C53,stroke:#5DCAA5,color:#FFFFFF
+    classDef amber fill:#EF9F27,stroke:#042C53,color:#042C53
+    classDef light fill:#F4F7FB,stroke:#042C53,color:#042C53
+
+    subgraph CLIENTS["CLIENTS"]
+        Browser["Web browser"]
+        Phone["Android phone app, Kotlin"]
+        Watch["Galaxy Watch app, Wear OS"]
     end
-    CF -->|HTTPS TCP 443, static| S3
-    CF -->|HTTP TCP 80, dynamic pages and APIs via IGW| ALBA
-    CF -->|HTTP TCP 80, same ALB| ALBB
+    Phone -. "Wearable Data Layer pairing (2)" .- Watch
+
+    subgraph EDGE["EDGE"]
+        CF["CloudFront, HTTPS to viewers"]
+    end
+
+    Browser -->|"HTTPS 443 (1)"| CF
+    Phone -->|"HTTPS 443 REST"| CF
+    Watch -->|"HTTPS 443, HMAC-signed workout and step events, POST /api/integrations/ingest"| CF
+
+    subgraph REGION["AWS Region ap-south-1"]
+        S3[("S3 web assets, private, OAC")]
+        subgraph VPC["VPC dg-habitloop-vpc 10.20.0.0/16, 2 AZs"]
+            IGW["Internet gateway"]
+            subgraph PUBLIC["PUBLIC tier, NACL + alb-sg"]
+                ALB["ALB, spans public-a 10.20.0.0/24 and public-b 10.20.1.0/24"]
+                NAT["One NAT gateway + EIP, in public-a"]
+            end
+            subgraph APP["APP tier, NACL + app-sg, app-a 10.20.10.0/24 and app-b 10.20.11.0/24"]
+                ECS["ECS Fargate, 7 services, 1 to 3 tasks each<br/>6 APIs on 47820, web SvelteKit on 47809<br/>Cloud Map dg-habitloop-service.habitloop.local (7)"]
+                LN["Lambda event-normalizer, Node.js 22"]
+                LA["Lambda analytics-updater, Node.js 22"]
+            end
+            subgraph DATA["DATA tier, NACL + db-sg, data-a 10.20.20.0/24 and data-b 10.20.21.0/24"]
+                RDS[("RDS PostgreSQL 16, db.t4g.micro, single-AZ")]
+            end
+            EPS3["S3 gateway endpoint"]
+            EPDD["DynamoDB gateway endpoint"]
+        end
+        subgraph MANAGED["AWS-MANAGED SERVICES"]
+            EB["EventBridge bus dg-habitloop-bus"]
+            Q1["SQS partner-events"]
+            Q2["SQS activity-logged"]
+            D1["DLQ partner-events-dlq"]
+            D2["DLQ activity-logged-dlq"]
+            DDB[("DynamoDB dg-habitloop-analytics")]
+            ECR["ECR, 7 image repos"]
+            SM["Secrets Manager: JWT, internal token, RDS-managed password"]
+            CW["CloudWatch logs, dashboard, alarms"]
+            SNS["SNS topic, email"]
+        end
+    end
+
+    CF -->|"HTTPS 443, OAC: /_app and static assets"| S3
+    CF -->|"HTTP 80 via IGW: pages and /api/*"| IGW
+    IGW --> ALB
+    ALB -->|"HTTP 47820 APIs, 47809 web"| ECS
+    ECS -->|"PostgreSQL TLS 5432 (3)"| RDS
+    ECS -. "TCP 443 AWS APIs, TCP 80 web to ALB" .-> NAT
+    NAT -. "TCP 443 egress" .-> IGW
+    IGW -. "TCP 443: ECR pulls, secrets, logs, PutEvents" .-> MANAGED
+    ECS -. "metrics and logs" .-> CW
+    EB -.->|"rule PartnerEventReceived"| Q1
+    EB -.->|"rule ActivityLogged"| Q2
+    Q1 -.->|"redrive after 3 receives"| D1
+    Q2 -.->|"redrive after 3 receives"| D2
+    Q1 -.->|"SQS trigger, managed (4)"| LN
+    Q2 -.->|"SQS trigger, managed"| LA
+    LN -->|"HTTP 47820 Cloud Map, activity and integration APIs (5)"| ECS
+    LA -->|"HTTPS 443 (6)"| EPDD
+    EPDD -->|"HTTPS 443"| DDB
+    EPS3 -->|"HTTPS 443"| S3
+    CW -. "alarm action (8)" .-> SNS
+
+    class CF,ALB,ECS,RDS,S3,DDB,ECR,SM,CW,SNS,IGW,NAT,EPS3,EPDD navy
+    class EB,Q1,Q2,D1,D2,LN,LA amber
+    class Browser,Phone,Watch light
 ```
 
-## Boundaries and routing
+## Case study flow
 
-- CloudFront is global, outside both the VPC and regional boundary. S3, EventBridge, SQS,
-  DynamoDB, ECR, Secrets Manager, CloudWatch and SNS are managed services outside the VPC.
-  Lambda execution environments are AWS-managed; the diagram places their VPC ENIs in the
-  app subnets, not a public Lambda listener. SQS polling/invocation is an AWS-managed path.
-  are topology labels, not promises of particular account AZ mappings. ALB spans both public
-  subnets. Seven ECS services each start with one task and can scale to three; the paired
-  ECS/Lambda symbols show eligible placement, not duplicate deployments per AZ.
-- RDS is one `db.t4g.micro` PostgreSQL 16 instance, not a Multi-AZ pair. Its subnet group spans
-  data-a and data-b and AWS chooses its instance placement. There is no standby in this build.
-- Public route table defaults to IGW; app defaults to one NAT in public-a; data has no default
-  route. S3 and DynamoDB gateway endpoints associate with the app route table only. Other AWS
-  API traffic uses NAT on 443. DNS uses the VPC resolver and Cloud Map `habitloop.local`.
-- ALB SG accepts TCP 80 from the CloudFront origin-facing prefix list and the NAT EIP `/32`.
-  It forwards 47820 to APIs and 47809 to web. App SG admits these from ALB and 47820 from
-  itself; DB SG admits 5432 from app SG only. Each tier has a NACL, with explicit stateless
-  reply ports 1024-65535. Data inbound is limited to 5432 from the app CIDRs.
-- `/api/*/internal` routes return 404 at listener priority 1. Service rules preserve the path,
-  while the default targets web. Web server API calls use NAT to the public ALB on 80;
-  backend and Lambda calls use Cloud Map directly on 47820.
-- EventBridge routes PartnerEventReceived and ActivityLogged to separate queues/consumers.
-  Event-normalizer writes through Activity and Integration APIs; analytics-updater writes to
-  DynamoDB through the endpoint. RecommendationAccepted has no configured consumer.
-- Arrows give destination TCP ports, except managed delivery/placement arrows explicitly marked
-  as having no customer listener. SG replies are stateful; NACLs need ephemeral return rules.
+| No. | Step |
+| --- | --- |
+| 1 | Sign up and create a habit: browser, CloudFront, ALB, user and activity APIs, RDS. |
+| 2 | Join a challenge and pair the watch: challenge API; the phone pairs the watch over the Wearable Data Layer (outside AWS). |
+| 3 | Wearable event ingested by the integration API and stored in RDS. |
+| 4 | PartnerEventReceived goes from EventBridge to SQS to the event-normalizer Lambda. |
+| 5 | The normalized event becomes an activity log entry through the Activity API on 47820. |
+| 6 | ActivityLogged goes from SQS to the analytics-updater Lambda, which writes aggregates to DynamoDB through the gateway endpoint. |
+| 7 | The recommendation API serves habit suggestions from stored progress. |
+| 8 | CloudWatch logs, dashboard and alarms notify through SNS email. |
 
-See [deployment and screenshot checklist](../deployment/README.md) for validation against AWS,
+## Facts and routing
+
+- Tiers: public 10.20.0.0/24 and 10.20.1.0/24, app 10.20.10.0/24 and 10.20.11.0/24, data
+  10.20.20.0/24 and 10.20.21.0/24, across the first two available AZs. Each tier has its own NACL
+  with explicit stateless reply ports 1024-65535. Data inbound is limited to 5432 from the app CIDRs.
+- Security group chain: CloudFront origin-facing prefix list to ALB on 80; ALB to app on 47820
+  (APIs) and 47809 (web); app to data on 5432. The ALB security group also admits TCP 80 from the
+  NAT EIP `/32`, because the web server calls the public ALB DNS name from inside the VPC.
+- CloudFront serves `/_app/*` and static asset extensions from private S3 through an origin access
+  control, and everything else (pages and `/api/*`) from the ALB over HTTP 80. Viewers are
+  redirected to HTTPS.
+- Public route table defaults to the IGW; the app route table defaults to the single NAT in
+  public-a; the data tier has no default route. The S3 and DynamoDB gateway endpoints attach to
+  the app route table only.
+- RDS is one single-AZ `db.t4g.micro` PostgreSQL 16 instance; its subnet group spans data-a and
+  data-b and there is no standby. Seven ECS services (six APIs plus web) each start with one task
+  and can scale to three. Lambda network interfaces sit in the app subnets.
+- EventBridge bus `dg-habitloop-bus` has two rules, each targeting its own SQS queue with a DLQ
+  (maxReceiveCount 3). The Lambdas are triggered by SQS, which is an AWS-managed path with no
+  inbound VPC port. RecommendationAccepted has no configured consumer.
+- The watch sends HMAC-signed workout and step events to `POST /api/integrations/ingest/{link_id}`
+  through CloudFront. The phone and watch pair over the Wearable Data Layer, which is not an AWS
+  network path.
+- Arrows give destination ports; managed delivery arrows are marked as having no customer listener.
+
+See the [deployment and screenshot checklist](../deployment/README.md) for validation against AWS,
 and the [application overview](../../README.md) for consistency and security trade-offs.
