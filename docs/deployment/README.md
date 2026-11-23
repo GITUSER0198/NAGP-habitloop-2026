@@ -106,7 +106,8 @@ Runtime notes to verify in the console:
   EventBridge, SQS and CloudWatch API access use HTTPS 443 through NAT; there are no interface
   endpoints for those services. AWS-managed SQS polling invokes Lambda without inbound VPC ports.
 - ECS execution-role secret injection reads the RDS-managed JSON credential and app secrets.
-  Bootstrap constructs an escaped database URL with `sslmode=require`. Lambda secret values
+  Bootstrap constructs an escaped database URL with `sslmode=no-verify` (TLS encryption without
+  server certificate verification). Lambda secret values
   rotation so the running tasks pick up fresh credentials.
 
 ## 5. Deploy frontend assets
@@ -117,11 +118,14 @@ Run from the same checkout and application revision used to build the web image:
 |---|---|
 | `./infra/scripts/deploy-frontend.ps1` | `sh infra/scripts/deploy-frontend.sh` |
 
-The helper installs/builds Stencil, installs/checks/builds web, syncs only
-`frontend/web/build/client` to S3, and waits for CloudFront invalidation with status/elapsed
-progress. Immutable assets get one-year cache metadata, others five minutes. It retains old
-asset keys so an older running server revision can still load its assets. It does not deploy
-the Node server; server changes need new images and an apply with the new SHA.
+The helper resolves the web image from the ECS service's task definition, authenticates to ECR,
+and pulls that image with Docker. It copies `build/client` from a temporary container without
+starting it, syncs those assets to S3, and waits for CloudFront invalidation with status/elapsed
+progress. This publishes the exact asset hashes referenced by the deployed server; rebuilding
+on another platform can produce different hashes. Immutable assets get one-year cache metadata,
+others five minutes. It retains old asset keys so an older running server revision can still
+load its assets. The temporary container and extracted files are cleaned up after the operation.
+It does not deploy the Node server; server changes need new images and an apply with the new SHA.
 
 CloudFront `/api/*`, HTML pages, form actions and SvelteKit data requests use the ALB without
 caching. `/_app/*`, configured static extensions and `/robots.txt` use S3 through OAC. Do not
@@ -139,9 +143,9 @@ reusing an existing seeded environment. Use the CloudFront output as the base UR
 | Seed | `npm run seed -- --base-url $awsBase` | `npm run seed -- --base-url "$aws_base"` |
 | Smoke | `./infra/scripts/smoke.ps1 -BASE_URL $awsBase` | `sh infra/scripts/smoke.sh "$aws_base"` |
 
-Expect six seed stages and all eight smoke steps PASS, including normalized partner delivery,
-replay deduplication, analytics and a repeated recommendation accept. Smoke leaves an isolated
-tenant. Perform the [UI walkthrough](../walkthrough.md) at the HTTPS CloudFront URL as well;
+Expect six seed stages and all twelve smoke steps PASS, including normalized partner delivery,
+replay deduplication, analytics, a repeated recommendation accept and test-community cleanup.
+Perform the [UI walkthrough](../walkthrough.md) at the HTTPS CloudFront URL as well;
 API smoke does not validate asset delivery or form origin handling. For the UI-generated
 simulator command, append `--gateway-url` with this HTTPS base URL.
 
