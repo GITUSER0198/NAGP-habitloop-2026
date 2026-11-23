@@ -45,7 +45,7 @@
       <small id="email-error" class="error">{errors.email ?? ''}</small>
       <label for="tenant">Tenant</label>
       <input id="tenant" value={tenantLabel(email)} readonly tabindex="-1" placeholder="Fills in as you type your email" aria-describedby="tenant-hint" />
-      <small id="tenant-hint" class="muted">Your organization is your tenant. Your data stays inside it.</small>
+      <small id="tenant-hint" class="muted">Your organization is your tenant.</small>
       <label for="password">Password</label><input id="password" type="password" name="password" required autocomplete={mode === 'register' ? 'new-password' : 'current-password'} aria-invalid={!!errors.password} aria-describedby="password-error" />
       <small id="password-error" class="error">{errors.password ?? ''}</small>
       {#if errors.timezone}<p class="error" role="alert">{errors.timezone}</p>{/if}
