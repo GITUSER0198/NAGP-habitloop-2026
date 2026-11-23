@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-val releaseApiUrl: String = (project.findProperty("habitloopApiUrl") as String?) ?: "https://example.cloudfront.net"
+val apiUrl: String = rootProject.extra["habitloopBaseUrl"] as String
 
 android {
     namespace = "com.dhruvgoel.habitloop.wear"
@@ -21,11 +21,11 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField("String", "API_BASE_URL", "\"http://127.0.0.1:47810\"")
+            buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
         }
         release {
             isMinifyEnabled = false
-            buildConfigField("String", "API_BASE_URL", "\"$releaseApiUrl\"")
+            buildConfigField("String", "API_BASE_URL", "\"$apiUrl\"")
         }
     }
 
@@ -57,3 +57,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 }
+
+// Deliver one current installable to the repository root without claiming that directory as an output.
+val deliveredApk = rootProject.projectDir.parentFile.resolve("habitloop-wear-debug.apk")
+tasks.register("deliverDebugApk") {
+    val apk = layout.buildDirectory.file("outputs/apk/debug/wear-debug.apk")
+    inputs.file(apk)
+    outputs.file(deliveredApk)
+    doLast {
+        apk.get().asFile.copyTo(deliveredApk, overwrite = true)
+        deliveredApk.setLastModified(System.currentTimeMillis())
+    }
+}
+tasks.matching { it.name == "assembleDebug" }.configureEach { finalizedBy("deliverDebugApk") }

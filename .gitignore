@@ -17,3 +17,6 @@ data/
 mobile/local.properties
 mobile/.gradle/
 mobile/**/build/
+
+/habitloop-*-debug.apk
+mobile/.kotlin/

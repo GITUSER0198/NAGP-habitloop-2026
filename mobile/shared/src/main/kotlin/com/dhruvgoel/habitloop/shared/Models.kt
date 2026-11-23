@@ -2,6 +2,8 @@ package com.dhruvgoel.habitloop.shared
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.Json
 
 val HabitJson: Json = Json {
@@ -62,7 +64,13 @@ data class Summary(
 )
 
 @Serializable
-data class WallChallenge(val id: String = "", val title: String = "")
+data class WallChallenge(
+    val id: String = "", val title: String = "",
+    val description: String = "", val visibility: String = "public",
+    @SerialName("start_date") val startDate: String = "",
+    @SerialName("end_date") val endDate: String = "",
+    @SerialName("target_count") val targetCount: Int = 0
+)
 
 @Serializable
 data class WallCommunity(val id: String = "", val name: String = "")
@@ -76,6 +84,9 @@ data class WallPost(
     @SerialName("created_at") val createdAt: String = "",
     val challenge: WallChallenge = WallChallenge(),
     val community: WallCommunity = WallCommunity(),
+    @SerialName("caring_value") val caringValue: String? = null,
+    @SerialName("participant_count") val participantCount: Int = 0,
+    @SerialName("latest_comments") val latestComments: List<WallComment> = emptyList(),
     @SerialName("like_count") val likeCount: Int = 0,
     @SerialName("liked_by_me") val likedByMe: Boolean = false,
     @SerialName("comment_count") val commentCount: Int = 0,
@@ -99,8 +110,8 @@ data class Recommendation(
     val id: String,
     @SerialName("activity_id") val activityId: String = "",
     val kind: String = "",
-    @SerialName("current_value") val currentValue: String? = null,
-    @SerialName("suggested_value") val suggestedValue: String? = null,
+    @SerialName("current_value") val currentValue: JsonElement? = null,
+    @SerialName("suggested_value") val suggestedValue: JsonElement? = null,
     val reason: String = "",
     val status: String = "pending"
 )
@@ -118,7 +129,10 @@ data class ActivityLog(
     val id: String = "",
     val status: String = "",
     @SerialName("logged_at") val loggedAt: String = "",
-    val source: String = ""
+    val source: String = "",
+    @SerialName("source_event_id") val sourceEventId: String? = null,
+    @SerialName("duration_min") val durationMin: Int? = null,
+    val metadata: JsonObject = JsonObject(emptyMap())
 )
 
 /** Sent from the phone to the watch over the Wearable Data Layer. */
@@ -139,3 +153,32 @@ object Pairing {
     const val PATH = "/habitloop/pairing"
     const val KEY_JSON = "payload"
 }
+
+@Serializable
+data class Organization(val domain: String = "")
+
+@Serializable
+data class Account(
+    val name: String = "", val email: String = "",
+    val organization: Organization? = null,
+    val community: CommunityRef = CommunityRef()
+)
+
+@Serializable
+data class RecommendationsPage(val recommendations: List<Recommendation> = emptyList())
+
+@Serializable
+data class LeaderboardEntry(val name: String = "Member", val rank: Int = 0, val count: Int = 0, val target: Int = 0)
+
+@Serializable
+data class ChallengeProgress(val leaderboard: List<LeaderboardEntry> = emptyList())
+
+@Serializable
+data class PartnerEvent(
+    val id: String = "",
+    @SerialName("event_id") val eventId: String = "",
+    val status: String = "",
+    val reason: String? = null,
+    @SerialName("received_at") val receivedAt: String = "",
+    val payload: JsonObject = JsonObject(emptyMap())
+)

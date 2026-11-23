@@ -7,7 +7,10 @@ import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -36,11 +39,21 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 object WatchPairing {
-    /** Creates the link, stores it, sends it over the Data Layer. Returns the number of connected watches. */
-    suspend fun pair(context: Context, api: HabitApi, store: TokenStore): Int {
+    /** Creates the link, stores it, sends it over the Data Layer. Returns the connected watch names. */
+    suspend fun pair(context: Context, api: HabitApi, store: TokenStore, progress: (String) -> Unit = {}): String {
+        progress("Checking connected wearables...")
+        val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+        if (nodes.isEmpty()) throw ApiException0("No wearable connected")
+        progress("Loading habits for the active community...")
         val map: Map<String, String> = ActivityMap.build(api.activities())
         if (map.isEmpty()) throw ApiException0("Create a habit first")
-        val link = api.createWatchLink(map)
+        progress("Preparing the wearable link...")
+        val previous = store.pairing?.takeIf {
+            it.baseUrl == BuildConfig.API_BASE_URL && it.activityMap == map &&
+                api.links().any { link -> link.id == it.linkId }
+        }
+        val link = previous?.let { com.dhruvgoel.habitloop.shared.IntegrationLink(it.linkId, ingestKey = it.ingestKey) }
+            ?: api.createWatchLink(map)
         val payload = PairingPayload(
             linkId = link.id,
             ingestKey = link.ingestKey ?: throw ApiException0("No ingest key returned"),
@@ -51,12 +64,13 @@ object WatchPairing {
             email = store.email,
             password = store.password
         )
-        store.pairing = payload
+        progress("Sending pairing to ${nodes.joinToString { it.displayName }}...")
         val req = PutDataMapRequest.create(Pairing.PATH)
         req.dataMap.putString(Pairing.KEY_JSON, HabitJson.encodeToString(PairingPayload.serializer(), payload))
         req.dataMap.putLong("ts", System.currentTimeMillis())
         Wearable.getDataClient(context).putDataItem(req.asPutDataRequest().setUrgent()).await()
-        return Wearable.getNodeClient(context).connectedNodes.await().size
+        store.pairing = payload
+        return nodes.joinToString { it.displayName }
     }
 }
 
@@ -64,11 +78,13 @@ class ApiException0(message: String) : Exception(message)
 
 @Composable
 fun RemoteImage(path: String, modifier: Modifier) {
-    val bmp: ImageBitmap? by produceState<ImageBitmap?>(null, path) {
-        value = withContext(Dispatchers.IO) {
+    var bmp: ImageBitmap? by remember(path) { mutableStateOf(null) }
+    LaunchedEffect(path) {
+        bmp = withContext(Dispatchers.IO) {
             try {
                 val full: String = if (path.startsWith("http")) path else BuildConfig.API_BASE_URL.trimEnd('/') + path
-                URL(full).openStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                URL(full).openConnection().apply { connectTimeout = 8000; readTimeout = 15000 }
+                    .getInputStream().use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
             } catch (e: Exception) { null }
         }
     }

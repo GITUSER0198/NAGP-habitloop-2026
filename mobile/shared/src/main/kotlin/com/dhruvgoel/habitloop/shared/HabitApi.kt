@@ -88,6 +88,21 @@ class HabitApi(
         return HabitJson.decodeFromString(AuthResponse.serializer(), check(call("POST", "/api/users/register", b, auth = false)))
     }
 
+    suspend fun me(): Account =
+        HabitJson.decodeFromString(Account.serializer(), check(call("GET", "/api/users/me")))
+
+    suspend fun challenge(id: String): WallChallenge =
+        HabitJson.decodeFromString(WallChallenge.serializer(), check(call("GET", "/api/challenges/$id")))
+
+    suspend fun progress(id: String): ChallengeProgress =
+        HabitJson.decodeFromString(ChallengeProgress.serializer(), check(call("GET", "/api/analytics/challenges/$id/progress")))
+
+    suspend fun links(): List<IntegrationLink> =
+        HabitJson.decodeFromString(ListSerializer(IntegrationLink.serializer()), check(call("GET", "/api/integrations/links")))
+
+    suspend fun events(linkId: String): List<PartnerEvent> =
+        HabitJson.decodeFromString(ListSerializer(PartnerEvent.serializer()), check(call("GET", "/api/integrations/links/$linkId/events")))
+
     suspend fun communities(): List<MyCommunity> =
         HabitJson.decodeFromString(ListSerializer(MyCommunity.serializer()), check(call("GET", "/api/users/communities")))
 
@@ -133,7 +148,7 @@ class HabitApi(
         HabitJson.decodeFromString(ListSerializer(ActivityLog.serializer()), check(call("GET", "/api/activities/$activityId/logs")))
 
     suspend fun recommendations(): List<Recommendation> =
-        HabitJson.decodeFromString(ListSerializer(Recommendation.serializer()), check(call("GET", "/api/recommendations?status=pending")))
+        HabitJson.decodeFromString(RecommendationsPage.serializer(), check(call("GET", "/api/recommendations?status=pending"))).recommendations
 
     suspend fun acceptRecommendation(id: String) { check(call("POST", "/api/recommendations/$id/accept", "{}")) }
     suspend fun dismissRecommendation(id: String) { check(call("POST", "/api/recommendations/$id/dismiss", "{}")) }
