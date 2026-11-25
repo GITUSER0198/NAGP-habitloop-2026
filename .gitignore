@@ -10,7 +10,7 @@ www/
 # Local container data (Postgres, DynamoDB Local)
 data/
 
-# Generated Lambda packages (infra/scripts/package-lambdas.ts)
+# Generated Lambda packages (scripts/package-lambdas.ts)
 /*.zip
 
 # Mobile local configuration and build artifacts
@@ -20,3 +20,6 @@ mobile/**/build/
 
 /habitloop-*-debug.apk
 mobile/.kotlin/
+
+# Demo recording: shipped in the submission zip, too large for Git
+/demo/

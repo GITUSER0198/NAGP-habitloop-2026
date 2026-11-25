@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location -LiteralPath $projectRoot
 try {
     if (-not (Test-Path -LiteralPath '.env')) {
@@ -15,7 +15,7 @@ try {
     docker compose up -d --wait --wait-timeout 180
     if ($LASTEXITCODE -ne 0) { throw 'Startup failed. Inspect docker compose ps and docker compose logs.' }
     docker compose ps
-    Write-Host 'HabitLoop is ready. Use infra/scripts/dev-down.ps1 to stop it.'
+    Write-Host 'HabitLoop is ready. Use ./scripts/dev-down.ps1 to stop it.'
 } finally {
     Pop-Location
 }

@@ -2,7 +2,7 @@ import { index, pgSchema, unique } from 'drizzle-orm/pg-core';
 import { getConfig } from '@habitloop/shared';
 
 const usersSchema = pgSchema(getConfig().dbSchema);
-// A community is a tenant. kind 'personal' is the private per-user space, never listed; kind 'organization' is the email domain, never listed.
+// Tenant ids isolate data. kind 'community' is a shared group; 'personal' is the private per-user space, never listed; 'organization' is the email domain, never listed.
 export const tenants = usersSchema.table('tenants', table => ({
   id: table.uuid('id').primaryKey(),
   name: table.varchar('name', { length: 200 }).notNull(),

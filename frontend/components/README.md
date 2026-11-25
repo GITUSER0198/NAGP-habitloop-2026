@@ -1,6 +1,6 @@
 # @habitloop/components
 
-From this folder, run `npm ci`, `npm run build`, and `npm test` on Windows, macOS, or Linux.
+From this folder, run `npm ci`, `npm run build`, and `npm test`.
 The library is emitted to `dist/` and `loader/`. The static demo is `www/index.html`.
 Serve the built demo through the project's web server on its assigned port, 47809.
 No additional development server or port is required.

@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Push-Location -LiteralPath $projectRoot
 try {
     Write-Host '[1 of 1] Stopping HabitLoop containers. Project data is retained.'

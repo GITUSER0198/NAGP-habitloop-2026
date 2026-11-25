@@ -1,13 +1,12 @@
 # HabitLoop web
 
-SvelteKit 2, Svelte 5 runes and adapter-node. Requires Node 22 or newer. The same
-commands work on Windows, macOS and Linux.
+SvelteKit 2, Svelte 5 runes and adapter-node. Requires Node 22 or newer.
 
 From the repository root, start the existing Compose stack. In this folder, run
 `npm start` to build the web image and start it detached. It waits for a healthy
 container and prints its URL. `npm stop` stops only the web container. Existing
 backend containers stay running. Logs use Compose's bounded log rotation.
-`start.bat` / `stop.bat` and `start.sh` / `stop.sh` wrap those commands.
+`start.bat` and `stop.bat` wrap those commands.
 
 For local development, build the shared components once with `npm ci` and
 `npm run build` in `../components`, then run `npm ci` here. Set `API_BASE_URL` to

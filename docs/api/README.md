@@ -1,20 +1,23 @@
 # HabitLoop API files
 
-Start the local stack with `docker compose up -d --build` from the repository root.
-The gateway defaults to `http://localhost:47810`. Public documentation is available at:
+The API is documented with OpenAPI 3 specifications and a Postman collection, all in this folder:
 
-| Service | Swagger UI | Exported specification |
-|---|---|---|
-| Users | <http://localhost:47810/api/users/docs> | `user-service.openapi.json` |
-| Activities | <http://localhost:47810/api/activities/docs> | `activity-service.openapi.json` |
-| Challenges | <http://localhost:47810/api/challenges/docs> | `challenge-service.openapi.json` |
-| Integrations | <http://localhost:47810/api/integrations/docs> | `integration-service.openapi.json` |
-| Analytics | <http://localhost:47810/api/analytics/docs> | `analytics-service.openapi.json` |
-| Recommendations | <http://localhost:47810/api/recommendations/docs> | `recommendation-service.openapi.json` |
+| Service | OpenAPI specification |
+|---|---|
+| All services combined | [habitloop.openapi.json](habitloop.openapi.json) |
+| User Service | [user-service.openapi.json](user-service.openapi.json) |
+| Activity Service | [activity-service.openapi.json](activity-service.openapi.json) |
+| Challenge Service | [challenge-service.openapi.json](challenge-service.openapi.json) |
+| Integration Service | [integration-service.openapi.json](integration-service.openapi.json) |
+| Analytics Service | [analytics-service.openapi.json](analytics-service.openapi.json) |
+| Recommendation Service | [recommendation-service.openapi.json](recommendation-service.openapi.json) |
+| Postman collection | [HabitLoop.postman_collection.json](HabitLoop.postman_collection.json) with [HabitLoop.local.postman_environment.json](HabitLoop.local.postman_environment.json) |
 
-Each UI reads `/api/<service-route>/openapi.json` through the gateway. Internal endpoints
-require both service authentication and a bearer token for the active community and are blocked at the gateway.
-They are excluded from the public specifications and collection.
+Open any specification in [Swagger Editor](https://editor.swagger.io) (File, Import file) to browse
+it. A running service also serves its Swagger UI at `/api/<service>/docs`.
+
+Internal service-to-service endpoints are blocked at the gateway and are not part of the public
+specifications or the collection.
 
 ## Demo and smoke walkthrough
 
@@ -48,13 +51,8 @@ partner events, create a new link in the app or collection and keep its returned
 Run the complete smoke walkthrough with either launcher:
 
 ```powershell
-./infra/scripts/smoke.ps1
-./infra/scripts/smoke.ps1 -BASE_URL https://your-gateway.example.com
-```
-
-```sh
-sh infra/scripts/smoke.sh
-sh infra/scripts/smoke.sh https://your-gateway.example.com
+./scripts/smoke.ps1
+./scripts/smoke.ps1 -BASE_URL https://your-gateway.example.com
 ```
 
 Both launchers run `npm run smoke` (`tools/smoke/src/smoke.ts`) with the same checks. They also
@@ -97,12 +95,10 @@ Run the exporter again after API changes. For AWS, set `BASE_URL` or pass
    its exact body in a pre-request script using Postman's Web Crypto support
    ([sandbox reference](https://learning.postman.com/v11/docs/tests-and-scripts/write-scripts/postman-sandbox-reference/pm-require)). Set `event_id`
    to a new value for a new event; reuse the same body and ID to exercise replay detection.
+   **Update Activity Mapping** changes which activity each workout type logs to, **Wearable Stats**
+   returns per-day steps, workouts and heart rate, and **Delete Workout** removes a workout
+   everywhere; set `partner_event_id` to an `id` from **List Events** first.
 6. In **Recommendation Service**, refresh suggestions, list pending/accepted/dismissed,
    accept or dismiss. Refresh saves the first pending timing suggestion as
    `recommendation_id`, falling back to the first suggestion. The seeded demo supplies
    the required history; newly registered accounts need history before suggestions appear.
-
-Delete and dismiss requests change the selected demo resources. Run those individually
-when desired. The analytics stream is a long-lived SSE response; stop it manually in
-Postman after inspecting an event. Exported environment and collection files contain no
-live tokens or ingest keys; keep local credential values private.

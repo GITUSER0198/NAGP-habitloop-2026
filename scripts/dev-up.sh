@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-project_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$project_root"
 if [ ! -f .env ]; then
     echo 'Create .env from .env.example and set your local secrets before starting.' >&2
@@ -13,4 +13,4 @@ docker compose --progress plain build
 echo '[3 of 3] Starting containers and waiting for health checks'
 docker compose up -d --wait --wait-timeout 180
 docker compose ps
-echo 'HabitLoop is ready. Use sh infra/scripts/dev-down.sh to stop it.'
+echo 'HabitLoop is ready. Use sh scripts/dev-down.sh to stop it.'

@@ -12,7 +12,7 @@
     "tools/seed",
     "tools/smoke",
     "tools/wearable-simulator",
-    "infra/scripts"
+    "scripts"
   ],
   "scripts": {
     "build": "npm run build -w @habitloop/shared && npm run build --workspaces --if-present",
@@ -21,8 +21,8 @@
     "seed": "tsx tools/seed/src/seed.ts",
     "smoke": "tsx tools/smoke/src/smoke.ts",
     "simulate": "tsx tools/wearable-simulator/src/simulate.ts",
-    "export-openapi": "tsx infra/scripts/export-openapi.ts",
-    "package-lambdas": "tsx infra/scripts/package-lambdas.ts"
+    "export-openapi": "tsx scripts/export-openapi.ts",
+    "package-lambdas": "tsx scripts/package-lambdas.ts"
   },
   "devDependencies": {
     "tsx": "^4.20.6"
